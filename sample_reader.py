@@ -48,6 +48,7 @@ class SymbolResolver:
 
     def __init__ (self, mappings):
         self.mappings = mappings
+        self.resultCache = {}
 
     def addr2line (self, binPath, addr):
         a2lOutput = subprocess.Popen(["addr2line", "-e", binPath, "-f", "-C", "0x%x" % addr],
@@ -66,6 +67,14 @@ class SymbolResolver:
         return (funcName, sourceFile, lineNo)
 
     def resolve (self, addr):
+        if self.resultCache.has_key(addr):
+            return self.resultCache[addr]
+        else:
+            res = self._resolveUncached(addr)
+            self.resultCache[addr] = res
+            return res
+
+    def _resolveUncached (self, addr):
         """ Returns (lib, function, source file, line number) tuple """
 
         m = self.mappings.find(addr)
