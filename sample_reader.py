@@ -70,7 +70,21 @@ class SymbolResolver:
             res = self.addr2line_real(None, None, ["eu-addr2line", "-M", self.mapFile, "-f", "-C", "0x%x" % addr])
             return res
         else:
-            res = self.addr2line_real(binPath, addr)
+            debugBin = "/usr/lib/debug/%s.debug" % binPath
+            res = None
+            if os.path.exists(debugBin):
+                res = self.addr2line_real(debugBin, addr)
+            if res is None or res[0] is None:
+                res = self.addr2line_real(binPath, addr)
+
+#             res = self.addr2line_real(binPath, addr)
+#             if res[0] is None:
+#                 # try to use standalone debuginfo lib
+#                 debugBin = "/usr/lib/debug/%s.debug" % binPath
+#                 #print "trying debug lib at '%s'" % debugBin
+#                 if os.path.exists(debugBin):
+#                     res = self.addr2line_real(debugBin, addr)
+
             return res
 
     def addr2line_real (self, binPath, addr, cmd=None):
