@@ -1,6 +1,6 @@
 
 
-all: app1
+all: app1 app2
 
 app%: app%.C
 	g++ -W -Wall -Wextra \
