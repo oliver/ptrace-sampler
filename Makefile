@@ -1,6 +1,6 @@
 
 
-all: app1 app2 ptrace-singlestep
+all: app1 app2 ptrace-singlestep ptrace-sampler
 
 app%: app%.C
 	g++ -W -Wall -Wextra \
