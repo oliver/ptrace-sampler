@@ -26,7 +26,7 @@ void CreateSample (const int pid)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    fprintf(outFile, "%d.%06d\t", int(tv.tv_sec), int(tv.tv_usec));
+    fprintf(outFile, "E: %d.%06d\t", int(tv.tv_sec), int(tv.tv_usec));
 
     const int ip = ptrace(PTRACE_PEEKUSER, pid, ipoffs, 0);
 	const int bp = ptrace(PTRACE_PEEKUSER, pid, bpoffs, 0);
@@ -93,6 +93,27 @@ int main (int argc, char* argv[])
     printf("waitpid result: pid=%d, stat=%d\n", waitRes, waitStat);
 
     ptrace(PTRACE_CONT, pid, 0, 0);
+
+
+    fprintf(outFile, "# trace file from %s\n", argv[0]);
+    fprintf(outFile, "# for PID %d\n", pid);
+    fprintf(outFile, "# samples taken every %d usec\n", sampleInterval);
+    fprintf(outFile, "# legend: M=mapping, E=event %d\n", pid);
+
+    // save mappings of child (required for address->line conversion later)
+    char mapFileName[200];
+    sprintf(mapFileName, "/proc/%d/maps", pid);
+    FILE* mapFd = fopen(mapFileName, "r");
+    while (true)
+    {
+        char line[500];
+        fgets(line, 500, mapFd);
+        fprintf(outFile, "M: %s", line);
+        if (feof(mapFd))
+        {
+            break;
+        }
+    }
 
     int64_t numSteps = 0;
     while (true)
