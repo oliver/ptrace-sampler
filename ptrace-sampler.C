@@ -68,7 +68,8 @@ int main (int argc, char* argv[])
         exit(1);
     }
     const int pid = atoi(argv[1]);
-    
+    int sampleInterval = 200 * 1000; // usec
+
     ipoffs = M_OFFSETOF(struct user, regs.eip);
 	spoffs = M_OFFSETOF(struct user, regs.esp);
 	bpoffs = M_OFFSETOF(struct user, regs.ebp);
@@ -103,8 +104,6 @@ int main (int argc, char* argv[])
             break;
         }
         
-        usleep(100);
-
         // interrupt child
         //printf("sending SIGTRAP...\n");
         kill(pid, SIGTRAP);
@@ -134,6 +133,7 @@ int main (int argc, char* argv[])
         ptrace(PTRACE_CONT, pid, 0, sigNo);
         //printf("child continued\n");
 
+        usleep(sampleInterval);
     }
     printf("exiting after %lld single-steps\n", numSteps);
 
