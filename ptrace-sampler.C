@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/time.h>
 
 #include <wait.h>
 #include <sys/ptrace.h>
@@ -33,6 +34,10 @@ FILE* outFile = stderr;
 
 void CreateSample (const int pid)
 {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    fprintf(outFile, "%d.%06d\t", int(tv.tv_sec), int(tv.tv_usec));
+
     const int ip = ptrace(PTRACE_PEEKUSER, pid, ipoffs, 0);
 	//const int sp = ptrace(PTRACE_PEEKUSER, pid, spoffs, 0);
 	const int bp = ptrace(PTRACE_PEEKUSER, pid, bpoffs, 0);
