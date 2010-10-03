@@ -68,7 +68,7 @@ int main (int argc, char* argv[])
         exit(1);
     }
     const int pid = atoi(argv[1]);
-    int sampleInterval = 200 * 1000; // usec
+    int sampleInterval = 5 * 1000; // usec
 
     ipoffs = M_OFFSETOF(struct user, regs.eip);
 	spoffs = M_OFFSETOF(struct user, regs.esp);
