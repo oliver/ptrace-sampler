@@ -56,6 +56,8 @@ class SymbolResolver:
         if len(lines) != 3:
             raise Exception("bad output from addr2line (got %d lines, expected 3)" % len(lines))
         funcName = lines[0]
+        if funcName == '??':
+            funcName = None
         (sourceFile, lineNo) = lines[1].rsplit(':', 1)
         lineNo = int(lineNo)
         return (funcName, sourceFile, lineNo)
@@ -106,10 +108,14 @@ def parseEvent (line):
 
         res = resolver.resolve(addr)
         #print res
-        if res[1] is None:
-            frames.append(addr)
-        else:
+        if res[1] is not None:
+            # show function name
             frames.append( res[1] )
+        if res[0] is not None:
+            # show lib name
+            frames.append( "(" + os.path.basename(res[0]) + ")" )
+        else:
+            frames.append( "0x%x" % addr )
 
 #        m = mappings.find(addr)
 #        if m:
