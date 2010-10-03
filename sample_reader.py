@@ -13,10 +13,12 @@ import re
 
 class Mappings:
     def __init__ (self):
+        self.origLines = []
         self.mappings = []
-        pass
 
     def parseLine (self, line):
+        self.origLines.append(line)
+
         # b74b3000-b760f000 r-xp 00000000 09:00 9593032    /lib/tls/i686/cmov/libc-2.9.so
         #(addrs, perms, offset, dev, inode, path) = line.split()
         parts = line.split()
@@ -42,17 +44,41 @@ class Mappings:
                 return m
         return None
 
+    def writeMappingFile (self):
+        tmpFile = '/tmp/mapFile.txt'
+        fd = open(tmpFile, 'w')
+        for l in self.origLines:
+            fd.write(l + '\n')
+        fd.close()
+        return tmpFile
+
 
 class SymbolResolver:
     # this is just a pile of hacks, based on looking at output from readelf and addr2line...
 
     def __init__ (self, mappings):
         self.mappings = mappings
+        self.mapFile = None
         self.resultCache = {}
 
+        self.haveEuAddr2line = False
+
     def addr2line (self, binPath, addr):
-        a2lOutput = subprocess.Popen(["addr2line", "-e", binPath, "-f", "-C", "0x%x" % addr],
-            stdout=subprocess.PIPE).communicate()[0]
+        if self.haveEuAddr2line:
+            if self.mapFile is None:
+                self.mapFile = self.mappings.writeMappingFile()
+            res = self.addr2line_real(None, None, ["eu-addr2line", "-M", self.mapFile, "-f", "-C", "0x%x" % addr])
+            return res
+        else:
+            res = self.addr2line_real(binPath, addr)
+            return res
+
+    def addr2line_real (self, binPath, addr, cmd=None):
+        if cmd is None:
+            cmd = ["addr2line", "-e", binPath, "-f", "-C", "0x%x" % addr]
+        #print "calling a2l: %s" % cmd
+        a2lOutput = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0]
+        #print "    output: %s" % a2lOutput
         lines = a2lOutput.split('\n')
         if len(lines) != 3:
             raise Exception("bad output from addr2line (got %d lines, expected 3)" % len(lines))
