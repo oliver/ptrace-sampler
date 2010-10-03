@@ -9,6 +9,11 @@
 #include <sys/ptrace.h>
 #include <sys/user.h>
 
+#include <vector>
+
+using std::vector;
+
+
 //
 // Sampling Functions
 //
@@ -16,13 +21,47 @@
 #define M_OFFSETOF(STRUCT, ELEMENT) \
 	(unsigned int) &((STRUCT *)NULL)->ELEMENT;
 
-int ipoffs, spoffs;
+int ipoffs, spoffs, bpoffs;
+
+/*struct Frame
+{
+    void* ebp;
+    void* eip;
+};*/
+
+FILE* outFile = stderr;
 
 void CreateSample (const int pid)
 {
     const int ip = ptrace(PTRACE_PEEKUSER, pid, ipoffs, 0);
-	const int sp = ptrace(PTRACE_PEEKUSER, pid, spoffs, 0);
-	printf("ip: %8x  sp: %8x\n", ip, sp);
+	//const int sp = ptrace(PTRACE_PEEKUSER, pid, spoffs, 0);
+	const int bp = ptrace(PTRACE_PEEKUSER, pid, bpoffs, 0);
+	//printf("ip: %8x  sp: %8x  bp: %8x\n", ip, sp, bp);
+
+    // printf("frame #0:  ip: %8x  sp: %8x  bp: %8x\n", ip, sp, bp);
+    fprintf(outFile, "%08x ", ip);
+
+	/*vector<Frame> frames;
+
+	Frame f1;
+	f1.ebp = (void*)bp;
+	f1.eip = (void*)ip;
+	frames.push_back(f1);*/
+
+    int oldBp = bp;
+    for (int i = 1; i < 10; i++)
+    {
+	    const int newBp = ptrace(PTRACE_PEEKDATA, pid, oldBp, 0);
+	    const int newIp = ptrace(PTRACE_PEEKDATA, pid, oldBp+4, 0);
+	    // printf("frame #%d:  ip: %8x  sp: %8x  bp: %8x\n", i, newIp, 0, newBp);
+	    fprintf(outFile, "%08x ", newIp);
+	    oldBp = newBp;
+	    if (newBp == 0x0 /*|| newBp == 0xFFFFFFFF*/)
+	    {
+	        break;
+	    }
+    }
+    fprintf(outFile, "\n");
 }
 
 
@@ -48,6 +87,7 @@ int main (int argc, char* argv[])
     
     ipoffs = M_OFFSETOF(struct user, regs.eip);
 	spoffs = M_OFFSETOF(struct user, regs.esp);
+	bpoffs = M_OFFSETOF(struct user, regs.ebp);
 
     signal(SIGINT, SignalHandler);
     signal(SIGTERM, SignalHandler);
