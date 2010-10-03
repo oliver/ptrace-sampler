@@ -34,7 +34,7 @@ void CreateSample (const int pid)
     fprintf(outFile, "%08x ", ip);
 
     int oldBp = bp;
-    for (int i = 1; i < 10; i++)
+    for (int i = 1; i < 40; i++)
     {
 	    const int newBp = ptrace(PTRACE_PEEKDATA, pid, oldBp, 0);
 	    const int newIp = ptrace(PTRACE_PEEKDATA, pid, oldBp+4, 0);
