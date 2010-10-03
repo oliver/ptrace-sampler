@@ -63,6 +63,16 @@ class SymbolResolver:
 
         self.haveEuAddr2line = False
 
+    def getTextSectionOffset (self, binPath):
+        readelfOutput = subprocess.Popen(["readelf", "-S", binPath], stdout=subprocess.PIPE).communicate()[0]
+        for line in readelfOutput.split('\n'):
+            #m = re.match(r'\s*\[\d+\]\s+\.text\s*')
+            parts = line.split()
+            if len(parts) > 5 and parts[1] == '.text' and parts[2] == 'PROGBITS':
+                offset = int(parts[4], 16)
+                return offset
+        return None
+
     def addr2line (self, binPath, addr):
         if self.haveEuAddr2line:
             if self.mapFile is None:
@@ -89,7 +99,7 @@ class SymbolResolver:
 
     def addr2line_real (self, binPath, addr, cmd=None):
         if cmd is None:
-            cmd = ["addr2line", "-e", binPath, "-f", "-C", "0x%x" % addr]
+            cmd = ["addr2line", "-e", binPath, "-f", "-C", "-j", ".text", "0x%x" % addr]
         #print "calling a2l: %s" % cmd
         a2lOutput = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0]
         #print "    output: %s" % a2lOutput
@@ -125,19 +135,27 @@ class SymbolResolver:
         if not(os.path.exists(libPath)):
             return (libPath, None, None, None)
 
-        readelfSummary = subprocess.Popen(["readelf", "-h", libPath], stdout=subprocess.PIPE).communicate()[0]
-        if re.search('Type:\s+EXEC ', readelfSummary):
-            # executable
-            (funcName, sourceFile, lineNo) = self.addr2line(libPath, addr)
-            return (libPath, funcName, sourceFile, lineNo)
-        elif re.search('Type:\s+DYN ', readelfSummary):
-            # lib
-            offset = addr - m[0][0]
-            (funcName, sourceFile, lineNo) = self.addr2line(libPath, offset)
-            return (libPath, funcName, sourceFile, lineNo)
-        else:
-            # unknown type
-            raise Exception("unrecognized ELF format in '%s'" % libPath)
+        offsetInBin = addr - m[0][0]
+        textSectionOffset = self.getTextSectionOffset(libPath)
+        offsetInTextSection = offsetInBin - textSectionOffset
+        
+        (funcName, sourceFile, lineNo) = self.addr2line(libPath, offsetInTextSection)
+        return (libPath, funcName, sourceFile, lineNo)
+
+#         readelfSummary = subprocess.Popen(["readelf", "-h", libPath], stdout=subprocess.PIPE).communicate()[0]
+#         if re.search('Type:\s+EXEC ', readelfSummary) or self.haveEuAddr2line:
+#             # executable
+#             (funcName, sourceFile, lineNo) = self.addr2line(libPath, addr)
+#             return (libPath, funcName, sourceFile, lineNo)
+#         elif re.search('Type:\s+DYN ', readelfSummary):
+#             # lib
+#             offset = addr - m[0][0]
+#             
+#             (funcName, sourceFile, lineNo) = self.addr2line(libPath, offset)
+#             return (libPath, funcName, sourceFile, lineNo)
+#         else:
+#             # unknown type
+#             raise Exception("unrecognized ELF format in '%s'" % libPath)
 
         return (libPath, None, None, None)
 
