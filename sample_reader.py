@@ -107,15 +107,21 @@ def parseEvent (line):
         addr = int(f, 16)
 
         res = resolver.resolve(addr)
+        #frames.append( (addr, res) )
+        frameRes = [addr]
+        if res:
+            frameRes += list(res)
+        frames.append( tuple(frameRes) )
         #print res
-        if res[1] is not None:
-            # show function name
-            frames.append( res[1] )
-        if res[0] is not None:
-            # show lib name
-            frames.append( "(" + os.path.basename(res[0]) + ")" )
-        else:
-            frames.append( "0x%x" % addr )
+
+#         if res[1] is not None:
+#             # show function name
+#             displayFrames.append( res[1] )
+#         elif res[0] is not None:
+#             # show lib name
+#             displayFrames.append( "(" + os.path.basename(res[0]) + ")" )
+#         else:
+#             displayFrames.append( "0x%x" % addr )
 
 #        m = mappings.find(addr)
 #        if m:
@@ -123,10 +129,11 @@ def parseEvent (line):
 #            if m[5]:
 #                print os.path.basename(m[5])
 
-    print "event at %s.%d: %s" % (time.strftime('%c', time.localtime(timeF) ), timeUsec, frames)
+    #print "event at %s.%d: %s" % (time.strftime('%c', time.localtime(timeF) ), timeUsec, displayFrames)
+    return (timeF, frames)
 
 
-def parseFile (path):
+def parseFile (path, eventHandler=None):
     fd = open(path, 'r')
     for line in fd:
         line = line.rstrip('\n')
@@ -135,15 +142,37 @@ def parseFile (path):
         elif line.startswith('M: '):
             mappings.parseLine(line[3:])
         elif line.startswith('E: '):
-            parseEvent(line[3:])
+            result = parseEvent(line[3:])
+            if eventHandler is not None:
+                eventHandler(result)
         else:
             raise Exception("invalid line: '%s'" % line)
 
+
+def handleEvent (e):
+    displayFrames = []
+    for frame in e[1]:
+        #print frame
+        if frame[2] is not None:
+            # show function name
+            text = frame[2]
+            if frame[3] is not None:
+                text += " (%s:%d)" % (os.path.basename(frame[3]), frame[4])
+            displayFrames.append( text )
+        elif frame[1] is not None:
+            # show lib name
+            displayFrames.append( "(" + os.path.basename(frame[1]) + ")" )
+        else:
+            displayFrames.append( "0x%x" % frame[0] )
+
+    timeUsec = int((e[0] - int(e[0])) * 1000000)
+    print "event at %s.%d: %s" % (time.strftime('%c', time.localtime(e[0]) ), timeUsec, displayFrames)
+    #sys.exit(1)
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print "Usage: %s <sample data file>" % sys.argv[0]
         sys.exit(1)
 
-    parseFile(sys.argv[1])
+    parseFile(sys.argv[1], handleEvent)
 
