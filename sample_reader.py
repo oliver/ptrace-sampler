@@ -61,9 +61,19 @@ class SymbolResolver:
         self.mapFile = None
         self.resultCache = {}
 
+        self.textSectionOffsetCache = {}
+
         self.haveEuAddr2line = False
 
     def getTextSectionOffset (self, binPath):
+        if self.textSectionOffsetCache.has_key(binPath):
+            return self.textSectionOffsetCache[binPath]
+        else:
+            res = self._getTextSectionOffset_real(binPath)
+            self.textSectionOffsetCache[binPath] = res
+            return res
+
+    def _getTextSectionOffset_real (self, binPath):
         readelfOutput = subprocess.Popen(["readelf", "-S", binPath], stdout=subprocess.PIPE).communicate()[0]
         for line in readelfOutput.split('\n'):
             #m = re.match(r'\s*\[\d+\]\s+\.text\s*')
