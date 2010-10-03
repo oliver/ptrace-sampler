@@ -125,8 +125,9 @@ int main (int argc, char* argv[])
             break;
         }
         
-        sleep(1);
-        //usleep(100);
+        //usleep(1);
+        usleep(100);
+        //usleep(500 * 1000);
         //sleep(1);
 
         // interrupt child
