@@ -60,6 +60,9 @@ class SymbolResolver:
             funcName = None
         (sourceFile, lineNo) = lines[1].rsplit(':', 1)
         lineNo = int(lineNo)
+        if sourceFile == '??':
+            sourceFile = None
+            lineNo = None
         return (funcName, sourceFile, lineNo)
 
     def resolve (self, addr):
