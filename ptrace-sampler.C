@@ -7,14 +7,35 @@
 
 #include <wait.h>
 #include <sys/ptrace.h>
+#include <sys/user.h>
 
+//
+// Sampling Functions
+//
+
+#define M_OFFSETOF(STRUCT, ELEMENT) \
+	(unsigned int) &((STRUCT *)NULL)->ELEMENT;
+
+int ipoffs, spoffs;
+
+void CreateSample (const int pid)
+{
+    const int ip = ptrace(PTRACE_PEEKUSER, pid, ipoffs, 0);
+	const int sp = ptrace(PTRACE_PEEKUSER, pid, spoffs, 0);
+	printf("ip: %8x  sp: %8x\n", ip, sp);
+}
+
+
+
+//
+// Tracing Functions
+//
 
 bool terminate = false;
 static void SignalHandler (int sig)
 {
     terminate = true;
 }
-
 
 int main (int argc, char* argv[])
 {
@@ -24,9 +45,12 @@ int main (int argc, char* argv[])
         exit(1);
     }
     const int pid = atoi(argv[1]);
+    
+    ipoffs = M_OFFSETOF(struct user, regs.eip);
+	spoffs = M_OFFSETOF(struct user, regs.esp);
 
-//    signal(SIGINT, SignalHandler);
-//    signal(SIGTERM, SignalHandler);
+    signal(SIGINT, SignalHandler);
+    signal(SIGTERM, SignalHandler);
 
     // attach
     printf("attaching to PID %d\n", pid);
@@ -57,9 +81,11 @@ int main (int argc, char* argv[])
         }
         
         sleep(1);
+        //usleep(100);
+        //sleep(1);
 
         // interrupt child
-        printf("sending SIGTRAP...\n");
+        //printf("sending SIGTRAP...\n");
         kill(pid, SIGTRAP);
 
         int sigNo = 0;
@@ -70,7 +96,7 @@ int main (int argc, char* argv[])
             exit(1);
         }*/
 
-        printf("waiting for child...\n");        
+        //printf("waiting for child...\n");        
         waitRes = wait(&waitStat);
         sigNo = WSTOPSIG(waitStat);
         if (sigNo == SIGTRAP)
@@ -85,12 +111,14 @@ int main (int argc, char* argv[])
             break;
         }
 
-        printf("child paused\n");
+        //printf("child paused\n");
         //usleep(500 * 1000);
         numSteps++;
 
+        CreateSample(pid);
+
         ptrace(PTRACE_CONT, pid, 0, sigNo);
-        printf("child continued\n");
+        //printf("child continued\n");
 
         //break;
     }
