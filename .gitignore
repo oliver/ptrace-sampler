@@ -1,2 +1,6 @@
 *~
 *.pyc
+app1
+app2
+ptrace-singlestep
+ptrace-sampler
