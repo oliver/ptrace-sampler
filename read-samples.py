@@ -126,12 +126,8 @@ def parseEvent (line):
     print "event at %s.%d: %s" % (time.strftime('%c', time.localtime(timeF) ), timeUsec, frames)
 
 
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print "Usage: %s <sample data file>" % sys.argv[0]
-        sys.exit(1)
-
-    fd = open(sys.argv[1], 'r')
+def parseFile (path):
+    fd = open(path, 'r')
     for line in fd:
         line = line.rstrip('\n')
         if line[0] == '#':
@@ -140,7 +136,14 @@ if __name__ == '__main__':
             mappings.parseLine(line[3:])
         elif line.startswith('E: '):
             parseEvent(line[3:])
-            #break
         else:
             raise Exception("invalid line: '%s'" % line)
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print "Usage: %s <sample data file>" % sys.argv[0]
+        sys.exit(1)
+
+    parseFile(sys.argv[1])
 
