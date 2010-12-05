@@ -113,9 +113,12 @@ class SymbolResolver:
         #print "calling a2l: %s" % cmd
         a2lOutput = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0]
         #print "    output: %s" % a2lOutput
+        if a2lOutput == '':
+            # a2l crashes on some libs; catch this
+            return (None, None, None)
         lines = a2lOutput.split('\n')
         if len(lines) != 3:
-            raise Exception("bad output from addr2line (got %d lines, expected 3)" % len(lines))
+            raise Exception("bad output from addr2line (got %d lines, expected 3); cmd: %s; output:\n%s" % (len(lines), cmd, lines))
         funcName = lines[0]
         if funcName == '??':
             funcName = None
