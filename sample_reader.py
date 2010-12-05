@@ -140,6 +140,8 @@ class SymbolResolver:
     def _resolveUncached (self, addr):
         """ Returns (lib, function, source file, line number) tuple """
 
+        assert(addr >= 0)
+
         m = self.mappings.find(addr)
         if m is None or m[5] is None:
             return (None, None, None, None)
@@ -149,7 +151,9 @@ class SymbolResolver:
             return (libPath, None, None, None)
 
         offsetInBin = addr - m[0][0]
+        assert(offsetInBin >= 0)
         textSectionOffset = self.getTextSectionOffset(libPath)
+        assert(textSectionOffset >= 0)
         offsetInTextSection = offsetInBin - textSectionOffset
         #assert(offsetInTextSection >= 0)
 
