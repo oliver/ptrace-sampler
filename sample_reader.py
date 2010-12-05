@@ -293,17 +293,16 @@ def handleEvent (e):
     displayFrames = []
     for frame in e[1]:
         #print frame
+        text = "0x%x" % frame[0]
         if frame[2] is not None:
             # show function name
-            text = frame[2]
+            text += ": " + frame[2]
             if frame[3] is not None:
                 text += " (%s:%d)" % (os.path.basename(frame[3]), frame[4])
-            displayFrames.append( text )
         elif frame[1] is not None:
             # show lib name
-            displayFrames.append( "(" + os.path.basename(frame[1]) + ")" )
-        else:
-            displayFrames.append( "0x%x" % frame[0] )
+            text += " (" + os.path.basename(frame[1]) + ")"
+        displayFrames.append(text)
 
     timeUsec = int((e[0] - int(e[0])) * 1000000)
     print "event at %s.%d: %s" % (time.strftime('%c', time.localtime(e[0]) ), timeUsec, displayFrames)
