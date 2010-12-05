@@ -15,13 +15,26 @@ def handleEvent (e):
 
     # NumSamples
     for f in e[1]:
-        if f[2] is not None:
-            lineNo = f[4]
-            if lineNo is None: lineNo = 0
-            outFd.write("fl=%s\n" % f[3])
-            outFd.write("fn=%s\n" % f[2])
-            outFd.write("%d %d\n" % (lineNo, 1))
-            break
+        #if f[2] is not None:
+        funcName = f[2]
+        if funcName is None:
+            if f[1] == '[vdso]':
+                funcName = '_vdso_'
+            else:
+                funcName = '_unknown_'
+        lineNo = f[4]
+        if lineNo is None: lineNo = 0
+        fileName = f[3]
+        if fileName is None:
+            if f[1]:
+                fileName = "_in_lib_%s" % f[1]
+            else:
+                fileName = ''
+
+        outFd.write("fl=%s\n" % fileName)
+        outFd.write("fn=%s\n" % funcName)
+        outFd.write("%d %d\n" % (lineNo, 1))
+        break
 
     # function calls
     outFd.write("# function calls\n")
