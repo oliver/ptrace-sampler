@@ -230,6 +230,13 @@ def parseFile (path, eventHandler=None):
 
 
 def handleEvent (e):
+    # e is a tuple of (timestamp, framelist).
+    # timestamp is a Unix timestamp as floating-point value.
+    # framelist is a list of tuples, representing the stack frames.
+    # tuple format:
+    # address (int), binary file, function name, source file name, source file line (int)
+    # except for address, all values can be None
+
     displayFrames = []
     for frame in e[1]:
         #print frame
