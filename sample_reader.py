@@ -61,6 +61,8 @@ class SymbolResolver:
         self.mapFile = None
         self.resultCache = {}
 
+        self.a2lProcs = {} # holds a list of running addr2line processes (indexed by binPath)
+
         self.textSectionOffsetCache = {}
 
         self.haveEuAddr2line = False
@@ -85,10 +87,11 @@ class SymbolResolver:
 
     def addr2line (self, binPath, addr):
         if self.haveEuAddr2line:
-            if self.mapFile is None:
-                self.mapFile = self.mappings.writeMappingFile()
-            res = self.addr2line_real(None, None, ["eu-addr2line", "-M", self.mapFile, "-f", "-C", "0x%x" % addr])
-            return res
+            raise Exception("unsupported (atm)")
+#             if self.mapFile is None:
+#                 self.mapFile = self.mappings.writeMappingFile()
+#             res = self.addr2line_real(None, None, ["eu-addr2line", "-M", self.mapFile, "-f", "-C", "0x%x" % addr])
+#             return res
         else:
             debugBin = "/usr/lib/debug/%s.debug" % binPath
             res = None
@@ -108,6 +111,44 @@ class SymbolResolver:
             return res
 
     def addr2line_real (self, binPath, addr, cmd=None):
+        if not(self.a2lProcs.has_key(binPath)) or self.a2lProcs[binPath] is None:
+            # start a2l process:
+            cmd = ["addr2line", "-e", binPath, "-f", "-C", "-j", ".text"]
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            self.a2lProcs[binPath] = proc
+
+        proc = self.a2lProcs[binPath]
+
+        #if not(self.a2lProcs.has_key(binPath)):
+        proc.poll()
+        if proc.returncode is not None:
+            # error starting a2l
+            raise Exception("a2l isn't running")
+            return (None, None, None)
+
+        proc.stdin.write("0x%x\n" % addr)
+
+        funcName = proc.stdout.readline().strip()
+        if funcName == '??':
+            funcName = None
+
+        line = proc.stdout.readline()
+        if line == '':
+            os.kill(proc.pid, 15)
+            #proc.send_signal(15)
+            self.a2lProcs[binPath] = None
+            return (funcName, None, None)
+
+        (sourceFile, lineNo) = line.strip().rsplit(':', 1)
+        lineNo = int(lineNo)
+        if sourceFile == '??':
+            sourceFile = None
+            lineNo = None
+
+        return (funcName, sourceFile, lineNo)
+
+
+    def addr2line_real_old1 (self, binPath, addr, cmd=None):
         if cmd is None:
             cmd = ["addr2line", "-e", binPath, "-f", "-C", "-j", ".text", "0x%x" % addr]
         #print "calling a2l: %s" % cmd
