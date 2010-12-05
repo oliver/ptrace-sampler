@@ -151,7 +151,12 @@ class SymbolResolver:
         offsetInBin = addr - m[0][0]
         textSectionOffset = self.getTextSectionOffset(libPath)
         offsetInTextSection = offsetInBin - textSectionOffset
-        
+        #assert(offsetInTextSection >= 0)
+
+        if offsetInTextSection < 0:
+            # not sure why, but this happens sometimes
+            return (libPath, None, None, None)
+
         (funcName, sourceFile, lineNo) = self.addr2line(libPath, offsetInTextSection)
         return (libPath, funcName, sourceFile, lineNo)
 
