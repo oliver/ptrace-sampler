@@ -14,6 +14,10 @@ def handleEvent (e):
     outFd.write("# event at %s\n" % ( time.strftime('%c', time.localtime(e[0]) ) ) )
 
     # NumSamples
+    frames = []
+    knownFunctions = {}
+
+    currFrame = 1
     for f in e[1]:
         #if f[2] is not None:
         funcName = f[2]
@@ -31,23 +35,33 @@ def handleEvent (e):
             else:
                 fileName = ''
 
-        outFd.write("fl=%s\n" % fileName)
-        outFd.write("fn=%s\n" % funcName)
-        outFd.write("%d %d\n" % (lineNo, 1))
-        break
+        # simple cycle detection
+        if not(knownFunctions.has_key(funcName)):
+            knownFunctions[funcName] = 1
+        else:
+            knownFunctions[funcName] += 1
+
+        if knownFunctions[funcName] > 1:
+            funcName += "'%d" % knownFunctions[funcName]
+
+        frames.append( (f[0], f[1], funcName, fileName, lineNo) )
+
+        if currFrame == 1:
+            outFd.write("fl=%s\n" % fileName)
+            outFd.write("fn=%s\n" % funcName)
+            outFd.write("%d %d\n" % (lineNo, 1))
+        currFrame += 1
 
     # function calls
     outFd.write("# function calls\n")
     currFrame = 1
-    for f in e[1][1:]:
+    for f in frames[1:]:
         if f[2] is not None:
-            prevFrame = e[1][ currFrame-1 ]
+            prevFrame = frames[ currFrame-1 ]
             
             if prevFrame[2] is not None:
                 lineNo = f[4]
-                if lineNo is None: lineNo = 0
                 prevLineNo = prevFrame[4]
-                if prevLineNo is None: prevLineNo = 0
 
                 outFd.write("fl=%s\n" % f[3])
                 outFd.write("fn=%s\n" % f[2])
