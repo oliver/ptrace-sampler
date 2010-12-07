@@ -1,12 +1,20 @@
 #!/bin/sh
 
-cmd=$1
-pid=`pgrep $cmd`
+arg=$1
+
+ps -p $arg &> /dev/null
+if [ $? == 0 ]; then
+    # arg is a valid PID
+    pid=$arg
+else
+    pid=`pgrep $arg`
+fi
 
 [ "x$pid" == "x" ] && exit 1
 
+
 echo "attaching to command '$cmd' (PID $pid)"
-tracefile=/tmp/trace-$cmd-`date +%Y%m%d-%H%M%S`-$pid.txt
+tracefile=/tmp/trace-$arg-`date +%Y%m%d-%H%M%S`-$pid.txt
 ./ptrace-sampler $pid 2>$tracefile
 echo "wrote $tracefile:"
 ls -lh $tracefile
