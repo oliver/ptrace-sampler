@@ -195,6 +195,9 @@ class SymbolResolver:
         offsetInBin = addr - m[0][0]
         assert(offsetInBin >= 0)
         textSectionOffset = self.getTextSectionOffset(libPath)
+        if textSectionOffset is None:
+            # can happen eg. if function is in /dev/zero...
+            return (libPath, None, None, None)
         assert(textSectionOffset >= 0)
         offsetInTextSection = offsetInBin - textSectionOffset
         #assert(offsetInTextSection >= 0)
