@@ -14,3 +14,7 @@ ptrace-%: ptrace-%.C
 	-o $@ \
 	$+
 
+release: ptrace-sampler
+	tar cvzf ../ptrace-sampler-release-`date '+%Y%m%d-%H%M%S'`.tgz \
+		ptrace-sampler sample_reader.py samples2calltree.py resolve_addr.py start_sampling.sh
+
