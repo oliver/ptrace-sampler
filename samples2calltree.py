@@ -26,7 +26,7 @@ def handleEvent (e):
             if f[1] == '[vdso]':
                 funcName = '_vdso_'
             else:
-                funcName = '_unknown_'
+                funcName = '_unknown_0x%08x' % f[0]
         lineNo = f[4]
         if lineNo is None: lineNo = 0
         fileName = f[3]
