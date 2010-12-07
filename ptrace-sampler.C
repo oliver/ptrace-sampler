@@ -140,10 +140,9 @@ int main (int argc, char* argv[])
         }
         else
         {
-            printf("child got unexpected signal %d\n", sigNo);
+            printf("child got signal %d\n", sigNo);
             ptrace(PTRACE_CONT, pid, 0, sigNo);
-            //exit(1);
-            break;
+            continue;
         }
 
         //printf("child paused\n");
