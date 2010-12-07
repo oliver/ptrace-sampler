@@ -79,6 +79,7 @@ class SymbolResolver:
         readelfOutput = subprocess.Popen(["readelf", "-S", binPath], stdout=subprocess.PIPE).communicate()[0]
         for line in readelfOutput.split('\n'):
             #m = re.match(r'\s*\[\d+\]\s+\.text\s*')
+            line = line.lstrip(' [')
             parts = line.split()
             if len(parts) > 5 and parts[1] == '.text' and parts[2] == 'PROGBITS':
                 offset = int(parts[4], 16)
