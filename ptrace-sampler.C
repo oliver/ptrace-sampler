@@ -2,14 +2,22 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <dirent.h>
+#include <vector>
 
 #include <wait.h>
 #include <sys/ptrace.h>
 #include <sys/user.h>
+#include <sys/reg.h>
 
+// from https://bugzilla.redhat.com/attachment.cgi?id=263751&action=edit :
+#include <asm/unistd.h>
+#define tkill(tid, sig) syscall (__NR_tkill, (tid), (sig))
 
 //
 // Sampling Functions
@@ -77,22 +85,59 @@ int main (int argc, char* argv[])
     signal(SIGINT, SignalHandler);
     signal(SIGTERM, SignalHandler);
 
-    // attach
-    printf("attaching to PID %d\n", pid);
-    if (ptrace(PTRACE_ATTACH, pid, 0, 0) != 0)
+    // find threads
+    std::vector<int> allTasks;
     {
-        perror("attach failed");
-    }
-    int waitStat = 0;
-    int waitRes = waitpid(pid, &waitStat, WUNTRACED);
-    if (waitRes != pid || !WIFSTOPPED(waitStat))
-    {
-        printf("unexpected waitpid result!\n");
-        exit(1);
-    }
-    printf("waitpid result: pid=%d, stat=%d\n", waitRes, waitStat);
+        char dirName[255];
+        sprintf(dirName, "/proc/%d/task/", pid);
+        DIR* taskDir = opendir(dirName);
+        if (!taskDir)
+        {
+            printf("opendir failed (%d - %s)\n", errno, strerror(errno));
+            exit(1);
+        }
 
-    ptrace(PTRACE_CONT, pid, 0, 0);
+        while (true)
+        {
+            struct dirent* dir = readdir(taskDir);
+            if (!dir)
+            {
+                break;
+            }
+            if (dir->d_name[0] == '.')
+            {
+                continue;
+            }
+            const int taskId = atoi(dir->d_name);
+            printf("    task: %d\n", taskId);
+            allTasks.push_back(taskId);
+        }
+    }
+
+    // attach
+    for (unsigned int i = 0; i < allTasks.size(); i++)
+    {
+        printf("attaching to PID %d\n", allTasks[i]);
+        if (ptrace(PTRACE_ATTACH, allTasks[i], 0, 0) != 0)
+        {
+            perror("attach failed");
+        }
+
+        int waitStat = 0;
+        int waitRes = waitpid(allTasks[i], &waitStat, WUNTRACED | __WALL);
+        if (waitRes != allTasks[i] || !WIFSTOPPED(waitStat))
+        {
+            printf("unexpected waitpid result '%d' for PID %d!\n", waitStat, waitRes);
+            exit(1);
+        }
+        printf("waitpid result: pid=%d, stat=%d\n", waitRes, waitStat);
+    }
+
+    // let all tasks continue
+    for (unsigned int i = 0; i < allTasks.size(); i++)
+    {
+        ptrace(PTRACE_CONT, allTasks[i], 0, 0);
+    }
 
 
     fprintf(outFile, "# trace file from %s\n", argv[0]);
@@ -124,34 +169,48 @@ int main (int argc, char* argv[])
             ptrace(PTRACE_CONT, pid, 0, 0);
             break;
         }
-        
+
         // interrupt child
-        //printf("sending SIGTRAP...\n");
-        kill(pid, SIGTRAP);
-
-        int sigNo = 0;
-
-        //printf("waiting for child...\n");        
-        waitRes = wait(&waitStat);
-        sigNo = WSTOPSIG(waitStat);
-        if (sigNo == SIGTRAP)
+        for (unsigned int i = 0; i < allTasks.size(); i++)
         {
-            sigNo = 0;
-        }
-        else
-        {
-            printf("child got signal %d\n", sigNo);
-            ptrace(PTRACE_CONT, pid, 0, sigNo);
-            continue;
+            //printf("sending SIGSTOP to %d...\n", allTasks[i]);
+            tkill(allTasks[i], SIGSTOP);
         }
 
-        //printf("child paused\n");
+        for (unsigned int i = 0; i < allTasks.size(); i++)
+        {
+            int sigNo = 0;
+
+            //printf("waiting for child %d...\n", allTasks[i]);
+            int waitStat = 0;
+            int waitRes = waitpid(allTasks[i], &waitStat, __WALL);
+            sigNo = WSTOPSIG(waitStat);
+            if (sigNo == SIGSTOP)
+            {
+                sigNo = 0;
+            }
+            else
+            {
+                printf("child got signal %d\n", sigNo);
+                ptrace(PTRACE_CONT, allTasks[i], 0, sigNo);
+                continue;
+            }
+
+            //printf("child paused\n");
+        }
+
         numSteps++;
 
-        CreateSample(pid);
+        for (unsigned int i = 0; i < allTasks.size(); i++)
+        {
+            CreateSample(allTasks[i]);
+        }
 
-        ptrace(PTRACE_CONT, pid, 0, sigNo);
-        //printf("child continued\n");
+        for (unsigned int i = 0; i < allTasks.size(); i++)
+        {
+            ptrace(PTRACE_CONT, allTasks[i], 0, 0);
+            //printf("child %d continued\n", allTasks[i]);
+        }
 
         usleep(sampleInterval);
     }
