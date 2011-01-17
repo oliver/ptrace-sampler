@@ -27,6 +27,8 @@ def handleEvent (e):
                 funcName = '_vdso_'
             else:
                 funcName = '_unknown_0x%08x' % f[0]
+                if f[1] is not None:
+                    funcName += "_" + os.path.basename(f[1])
         lineNo = f[4]
         if lineNo is None: lineNo = 0
         fileName = f[3]
