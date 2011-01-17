@@ -1,6 +1,11 @@
 
 
-all: app1 app2 app4 ptrace-singlestep ptrace-sampler
+BIN=app1 app2 app4 ptrace-singlestep ptrace-sampler
+
+all: $(BIN)
+
+clean:
+	rm -f $(BIN)
 
 app%: app%.C
 	g++ -W -Wall -Wextra \
