@@ -1,10 +1,11 @@
 
 
-all: app1 app2 ptrace-singlestep ptrace-sampler
+all: app1 app2 app4 ptrace-singlestep ptrace-sampler
 
 app%: app%.C
 	g++ -W -Wall -Wextra \
 	-g3 -O0 -rdynamic \
+	-pthread \
 	-o $@ \
 	$+
 
