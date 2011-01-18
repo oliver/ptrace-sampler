@@ -34,7 +34,7 @@ void CreateSample (const int pid)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    fprintf(outFile, "E: %d.%06d\t", int(tv.tv_sec), int(tv.tv_usec));
+    fprintf(outFile, "E: t=%d.%06d;p=%d\t", int(tv.tv_sec), int(tv.tv_usec), pid);
 
     const int ip = ptrace(PTRACE_PEEKUSER, pid, ipoffs, 0);
 	const int bp = ptrace(PTRACE_PEEKUSER, pid, bpoffs, 0);

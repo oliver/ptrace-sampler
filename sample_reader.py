@@ -234,10 +234,25 @@ resolver = SymbolResolver( mappings )
 def parseEvent (line):
     #print "line: %s" % line
     (timeStr, stacktrace) = line.split('\t')
-    (timeSec, timeUsec) = timeStr.split('.')
+    attrs = {}
+    if timeStr.find('t=') >= 0:
+        # new-style format
+        for p in timeStr.split(';'):
+            (k,v) = p.split('=')
+            attrs[k] = v
+    else:
+        # old-style format
+        attrs['t'] = timeStr
+
+    (timeSec, timeUsec) = attrs['t'].split('.')
     timeSec = int(timeSec, 10)
     timeUsec = int(timeUsec, 10)
-    timeF = float(timeStr)
+    timeF = float(attrs['t'])
+
+    if attrs.has_key('p'):
+        pid = int(attrs['p'])
+    else:
+        pid = None
 
     frames = []
     for f in stacktrace.split():
@@ -267,7 +282,7 @@ def parseEvent (line):
 #                print os.path.basename(m[5])
 
     #print "event at %s.%d: %s" % (time.strftime('%c', time.localtime(timeF) ), timeUsec, displayFrames)
-    return (timeF, frames)
+    return (timeF, frames, pid)
 
 
 def parseFile (path, eventHandler=None):
@@ -309,7 +324,7 @@ def handleEvent (e):
         displayFrames.append(text)
 
     timeUsec = int((e[0] - int(e[0])) * 1000000)
-    print "event at %s.%d: %s" % (time.strftime('%c', time.localtime(e[0]) ), timeUsec, displayFrames)
+    print "event at %s.%d [pid %d]: %s" % (time.strftime('%c', time.localtime(e[0]) ), timeUsec, e[2], displayFrames)
     #sys.exit(1)
 
 if __name__ == '__main__':
