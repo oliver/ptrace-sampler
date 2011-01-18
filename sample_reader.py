@@ -285,21 +285,33 @@ def parseEvent (line):
     return (timeF, frames, pid)
 
 
-def parseFile (path, eventHandler=None):
+def parseFile (path, eventHandler=None, headerHandler=None):
     fd = open(path, 'r')
+    threads = []
+    headerFinished = False
     for line in fd:
         line = line.rstrip('\n')
         if line[0] == '#':
             continue
         elif line.startswith('M: '):
             mappings.parseLine(line[3:])
+        elif line.startswith('T: '):
+            threads.append(int(line[3:]))
         elif line.startswith('E: '):
+            if headerHandler and not(headerFinished):
+                header = {'all_threads': threads}
+                headerHandler(header)
+            headerFinished = True
             result = parseEvent(line[3:])
             if eventHandler is not None:
                 eventHandler(result)
         else:
             raise Exception("invalid line: '%s'" % line)
 
+
+def handleHeader (header):
+    if header.has_key('all_threads'):
+        print "threads: " + " ".join( [str(t) for t in header['all_threads']] )
 
 def handleEvent (e):
     # e is a tuple of (timestamp, framelist).
@@ -332,5 +344,5 @@ if __name__ == '__main__':
         print "Usage: %s <sample data file>" % sys.argv[0]
         sys.exit(1)
 
-    parseFile(sys.argv[1], handleEvent)
+    parseFile(sys.argv[1], handleEvent, handleHeader)
 

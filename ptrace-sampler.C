@@ -85,6 +85,11 @@ int main (int argc, char* argv[])
     signal(SIGINT, SignalHandler);
     signal(SIGTERM, SignalHandler);
 
+    fprintf(outFile, "# trace file from %s\n", argv[0]);
+    fprintf(outFile, "# for PID %d\n", pid);
+    fprintf(outFile, "# samples taken every %d usec\n", sampleInterval);
+    fprintf(outFile, "# legend: T=thread, M=mapping, E=event\n");
+
     // find threads
     std::vector<int> allTasks;
     {
@@ -110,6 +115,7 @@ int main (int argc, char* argv[])
             }
             const int taskId = atoi(dir->d_name);
             printf("    task: %d\n", taskId);
+            fprintf(outFile, "T: %d\n", taskId);
             allTasks.push_back(taskId);
         }
     }
@@ -139,11 +145,6 @@ int main (int argc, char* argv[])
         ptrace(PTRACE_CONT, allTasks[i], 0, 0);
     }
 
-
-    fprintf(outFile, "# trace file from %s\n", argv[0]);
-    fprintf(outFile, "# for PID %d\n", pid);
-    fprintf(outFile, "# samples taken every %d usec\n", sampleInterval);
-    fprintf(outFile, "# legend: M=mapping, E=event %d\n", pid);
 
     // save mappings of child (required for address->line conversion later)
     char mapFileName[200];
