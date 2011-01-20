@@ -45,6 +45,8 @@ def handleEvent (e):
 
     currFrame = 1
     for f in e[1]:
+        binName = f[1]
+        if binName is None: binName = '???'
         funcName = f[2]
         if funcName is None:
             if f[1] == '[vdso]':
@@ -56,11 +58,7 @@ def handleEvent (e):
         lineNo = f[4]
         if lineNo is None: lineNo = 0
         fileName = f[3]
-        if fileName is None:
-            if f[1]:
-                fileName = "_in_lib_%s" % f[1]
-            else:
-                fileName = ''
+        if fileName is None: fileName = '???'
 
         # simple cycle detection
         if not(knownFunctions.has_key(funcName)):
@@ -72,9 +70,10 @@ def handleEvent (e):
             funcName += "'%d" % knownFunctions[funcName]
 
         # (addr, binary file, function, source file, line number)
-        frames.append( (f[0], f[1], funcName, fileName, lineNo) )
+        frames.append( (f[0], binName, funcName, fileName, lineNo) )
 
         if currFrame == 1:
+            outFd.write("ob=%s\n" % binName)
             outFd.write("fl=%s\n" % fileName)
             outFd.write("fn=%s\n" % funcName)
             outFd.write("%d %d%s\n" % (lineNo, costOne, threadCostStr))
@@ -91,8 +90,10 @@ def handleEvent (e):
                 lineNo = f[4]
                 prevLineNo = prevFrame[4]
 
+                outFd.write("ob=%s\n" % f[1])
                 outFd.write("fl=%s\n" % f[3])
                 outFd.write("fn=%s\n" % f[2])
+                outFd.write("cob=%s\n" % prevFrame[1])
                 outFd.write("cfl=%s\n" % prevFrame[3])
                 outFd.write("cfn=%s\n" % prevFrame[2])
                 outFd.write("calls=%d %d\n" % (costOne, prevLineNo))
