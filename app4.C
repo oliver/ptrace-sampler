@@ -25,12 +25,24 @@ int Calc1 (const int input)
 }
 
 
+int Calc2 (const int input)
+{
+    int result = input;
+    for (int i = 0; i < 10000; i++)
+    {
+        result += (i*i*i);
+    }
+    return result;
+}
+
+
 void* WorkFunc (void* userData)
 {
     int* value = (int*)userData;
     while (1)
     {
         *value = Calc1(*value);
+        *value = Calc2(*value);
     }
     return NULL;
 }
