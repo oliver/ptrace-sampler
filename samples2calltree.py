@@ -25,11 +25,18 @@ def handleEvent (e):
     #print e
     threadId = e[2]
     if numThreads > 1:
-        threadCost = [0] * numThreads
+        # hack to work around https://bugs.kde.org/show_bug.cgi?id=263594:
+        # (Kcachegrind chokes if a call has an inclusive cost of zero for some event types)
+        costZero = 1
+        costOne = 1000
+
+        threadCost = [costZero] * numThreads
         threadIndex = allThreads.index(threadId)
-        threadCost[threadIndex] = 1
+        threadCost[threadIndex] = costOne
         threadCostStr = " " + (" ".join( [ str(x) for x in threadCost ] ))
     else:
+        costZero = 0
+        costOne = 1
         threadCostStr = ""
 
     outFd.write("# event at %s (PID: %d)\n" % ( time.strftime('%c', time.localtime(e[0]) ), threadId) )
@@ -72,7 +79,7 @@ def handleEvent (e):
         if currFrame == 1:
             outFd.write("fl=%s\n" % fileName)
             outFd.write("fn=%s\n" % funcName)
-            outFd.write("%d %d%s\n" % (lineNo, 1, threadCostStr))
+            outFd.write("%d %d%s\n" % (lineNo, costOne, threadCostStr))
         currFrame += 1
 
     # function calls
@@ -90,8 +97,8 @@ def handleEvent (e):
                 outFd.write("fn=%s\n" % f[2])
                 outFd.write("cfl=%s\n" % prevFrame[3])
                 outFd.write("cfn=%s\n" % prevFrame[2])
-                outFd.write("calls=1 %d\n" % prevLineNo)
-                outFd.write("%d 1%s\n" % (lineNo, threadCostStr))
+                outFd.write("calls=%d %d\n" % (costOne, prevLineNo))
+                outFd.write("%d %d%s\n" % (lineNo, costOne, threadCostStr))
                 
             
             #outFd.write("%d 0 %d\n" % (f[4], 1))
