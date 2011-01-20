@@ -22,7 +22,6 @@ def handleHeader (header):
     outFd.write("\n\n")
 
 def handleEvent (e):
-    #print e
     threadId = e[2]
     if numThreads > 1:
         # hack to work around https://bugs.kde.org/show_bug.cgi?id=263594:
@@ -41,13 +40,11 @@ def handleEvent (e):
 
     outFd.write("# event at %s (PID: %d)\n" % ( time.strftime('%c', time.localtime(e[0]) ), threadId) )
 
-    # NumSamples
     frames = []
     knownFunctions = {}
 
     currFrame = 1
     for f in e[1]:
-        #if f[2] is not None:
         funcName = f[2]
         if funcName is None:
             if f[1] == '[vdso]':
@@ -74,6 +71,7 @@ def handleEvent (e):
         if knownFunctions[funcName] > 1:
             funcName += "'%d" % knownFunctions[funcName]
 
+        # (addr, binary file, function, source file, line number)
         frames.append( (f[0], f[1], funcName, fileName, lineNo) )
 
         if currFrame == 1:
@@ -99,14 +97,9 @@ def handleEvent (e):
                 outFd.write("cfn=%s\n" % prevFrame[2])
                 outFd.write("calls=%d %d\n" % (costOne, prevLineNo))
                 outFd.write("%d %d%s\n" % (lineNo, costOne, threadCostStr))
-                
-            
-            #outFd.write("%d 0 %d\n" % (f[4], 1))
         currFrame += 1
 
     outFd.write("\n")
-
-    #sys.exit(1)
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
