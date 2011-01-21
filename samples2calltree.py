@@ -5,6 +5,7 @@ import os
 import time
 
 from sample_reader import parseFile
+import syscalls
 
 
 outFd = None
@@ -55,8 +56,12 @@ def handleEvent (e):
             if f[1] == '[vdso]':
                 funcName = '_vdso_'
                 if currFrame == 1 and regs.has_key('oeax'):
+                    # resolve syscall number which was stored in ORIG_EAX:
                     syscallId = regs['oeax']
-                    funcName = 'SYS_%d' % syscallId
+                    if syscalls.SYSCALL_TABLE.has_key(syscallId):
+                        funcName = 'SYS_%s' % syscalls.SYSCALL_TABLE[syscallId]
+                    else:
+                        funcName = 'SYS_%d' % syscallId
             else:
                 funcName = '_unknown_0x%08x' % f[0]
                 if f[1] is not None:
