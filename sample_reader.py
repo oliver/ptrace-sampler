@@ -82,8 +82,9 @@ class SymbolResolver:
             line = line.lstrip(' [')
             parts = line.split()
             if len(parts) > 5 and parts[1] == '.text' and parts[2] == 'PROGBITS':
+                addr = int(parts[3], 16)
                 offset = int(parts[4], 16)
-                return offset
+                return (addr, offset)
         return None
 
     def addr2line (self, binPath, addr):
@@ -194,7 +195,7 @@ class SymbolResolver:
 
         offsetInBin = addr - m[0][0]
         assert(offsetInBin >= 0)
-        textSectionOffset = self.getTextSectionOffset(libPath)
+        (textSectionAddr, textSectionOffset) = self.getTextSectionOffset(libPath)
         if textSectionOffset is None:
             # can happen eg. if function is in /dev/zero...
             return (libPath, None, None, None, None)
@@ -207,7 +208,9 @@ class SymbolResolver:
             return (libPath, None, None, None, None)
 
         (funcName, sourceFile, lineNo) = self.addr2line(libPath, offsetInTextSection)
-        return (libPath, funcName, sourceFile, lineNo, offsetInBin)
+        offsetInLib = textSectionAddr + offsetInTextSection
+
+        return (libPath, funcName, sourceFile, lineNo, offsetInLib)
 
 #         readelfSummary = subprocess.Popen(["readelf", "-h", libPath], stdout=subprocess.PIPE).communicate()[0]
 #         if re.search('Type:\s+EXEC ', readelfSummary) or self.haveEuAddr2line:
