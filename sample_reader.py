@@ -180,34 +180,34 @@ class SymbolResolver:
             return res
 
     def _resolveUncached (self, addr):
-        """ Returns (lib, function, source file, line number) tuple """
+        """ Returns (lib, function, source file, line number, lib-local function address) tuple """
 
         assert(addr >= 0)
 
         m = self.mappings.find(addr)
         if m is None or m[5] is None:
-            return (None, None, None, None)
+            return (None, None, None, None, None)
 
         libPath = m[5]
         if not(os.path.exists(libPath)):
-            return (libPath, None, None, None)
+            return (libPath, None, None, None, None)
 
         offsetInBin = addr - m[0][0]
         assert(offsetInBin >= 0)
         textSectionOffset = self.getTextSectionOffset(libPath)
         if textSectionOffset is None:
             # can happen eg. if function is in /dev/zero...
-            return (libPath, None, None, None)
+            return (libPath, None, None, None, None)
         assert(textSectionOffset >= 0)
         offsetInTextSection = offsetInBin - textSectionOffset
         #assert(offsetInTextSection >= 0)
 
         if offsetInTextSection < 0:
             # not sure why, but this happens sometimes
-            return (libPath, None, None, None)
+            return (libPath, None, None, None, None)
 
         (funcName, sourceFile, lineNo) = self.addr2line(libPath, offsetInTextSection)
-        return (libPath, funcName, sourceFile, lineNo)
+        return (libPath, funcName, sourceFile, lineNo, offsetInBin)
 
 #         readelfSummary = subprocess.Popen(["readelf", "-h", libPath], stdout=subprocess.PIPE).communicate()[0]
 #         if re.search('Type:\s+EXEC ', readelfSummary) or self.haveEuAddr2line:
@@ -224,7 +224,7 @@ class SymbolResolver:
 #             # unknown type
 #             raise Exception("unrecognized ELF format in '%s'" % libPath)
 
-        return (libPath, None, None, None)
+        return (libPath, None, None, None, None)
 
 
 mappings = Mappings()
