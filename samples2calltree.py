@@ -63,7 +63,7 @@ def handleEvent (e):
                     else:
                         funcName = 'SYS_%d' % syscallId
             else:
-                funcName = '_unknown_0x%08x' % f[0]
+                funcName = '_0x%08x' % f[0]
                 if f[1] is not None:
                     funcName += "_" + os.path.basename(f[1])
         lineNo = f[4]
