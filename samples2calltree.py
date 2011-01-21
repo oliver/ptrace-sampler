@@ -44,6 +44,7 @@ def handleEvent (e):
 
     frames = []
     knownFunctions = {}
+    regs = e[3]
 
     currFrame = 1
     for f in e[1]:
@@ -53,6 +54,9 @@ def handleEvent (e):
         if funcName is None:
             if f[1] == '[vdso]':
                 funcName = '_vdso_'
+                if currFrame == 1 and regs.has_key('oeax'):
+                    syscallId = regs['oeax']
+                    funcName = 'SYS_%d' % syscallId
             else:
                 funcName = '_unknown_0x%08x' % f[0]
                 if f[1] is not None:

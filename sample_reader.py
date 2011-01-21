@@ -191,6 +191,11 @@ def parseEvent (line):
     else:
         pid = None
 
+    regs = {}
+    for k,v in attrs.items():
+        if k.startswith('r_'):
+            regs[ k[2:] ] = int(v, 16)
+
     frames = []
     for f in stacktrace.split():
         addr = int(f, 16)
@@ -219,7 +224,7 @@ def parseEvent (line):
 #                print os.path.basename(m[5])
 
     #print "event at %s.%d: %s" % (time.strftime('%c', time.localtime(timeF) ), timeUsec, displayFrames)
-    return (timeF, frames, pid)
+    return (timeF, frames, pid, regs)
 
 
 def parseFile (path, eventHandler=None, headerHandler=None):

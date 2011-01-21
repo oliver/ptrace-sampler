@@ -34,10 +34,14 @@ void CreateSample (const int pid)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    fprintf(outFile, "E: t=%d.%06d;p=%d\t", int(tv.tv_sec), int(tv.tv_usec), pid);
 
-    const int ip = ptrace(PTRACE_PEEKUSER, pid, ipoffs, 0);
-	const int bp = ptrace(PTRACE_PEEKUSER, pid, bpoffs, 0);
+    struct user_regs_struct regs;
+    memset(&regs, 0x00, sizeof(regs));
+    ptrace(PTRACE_GETREGS, pid, 0, &regs);
+    fprintf(outFile, "E: t=%d.%06d;p=%d;r_oeax=%x\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.orig_eax);
+
+    const int ip = regs.eip;
+    const int bp = regs.ebp;
 
     fprintf(outFile, "%08x ", ip);
 
