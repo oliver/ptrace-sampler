@@ -44,14 +44,6 @@ class Mappings:
                 return m
         return None
 
-    def writeMappingFile (self):
-        tmpFile = '/tmp/mapFile.txt'
-        fd = open(tmpFile, 'w')
-        for l in self.origLines:
-            fd.write(l + '\n')
-        fd.close()
-        return tmpFile
-
 
 class SymbolResolver:
     # this is just a pile of hacks, based on looking at output from readelf and addr2line...
@@ -64,8 +56,6 @@ class SymbolResolver:
         self.a2lProcs = {} # holds a list of running addr2line processes (indexed by binPath)
 
         self.textSectionOffsetCache = {}
-
-        self.haveEuAddr2line = False
 
     def getTextSectionOffset (self, binPath):
         if self.textSectionOffsetCache.has_key(binPath):
@@ -88,29 +78,13 @@ class SymbolResolver:
         return None
 
     def addr2line (self, binPath, addr):
-        if self.haveEuAddr2line:
-            raise Exception("unsupported (atm)")
-#             if self.mapFile is None:
-#                 self.mapFile = self.mappings.writeMappingFile()
-#             res = self.addr2line_real(None, None, ["eu-addr2line", "-M", self.mapFile, "-f", "-C", "0x%x" % addr])
-#             return res
-        else:
-            debugBin = "/usr/lib/debug/%s.debug" % binPath
-            res = None
-            if os.path.exists(debugBin):
-                res = self.addr2line_real(debugBin, addr)
-            if res is None or res[0] is None:
-                res = self.addr2line_real(binPath, addr)
-
-#             res = self.addr2line_real(binPath, addr)
-#             if res[0] is None:
-#                 # try to use standalone debuginfo lib
-#                 debugBin = "/usr/lib/debug/%s.debug" % binPath
-#                 #print "trying debug lib at '%s'" % debugBin
-#                 if os.path.exists(debugBin):
-#                     res = self.addr2line_real(debugBin, addr)
-
-            return res
+        debugBin = "/usr/lib/debug/%s.debug" % binPath
+        res = None
+        if os.path.exists(debugBin):
+            res = self.addr2line_real(debugBin, addr)
+        if res is None or res[0] is None:
+            res = self.addr2line_real(binPath, addr)
+        return res
 
     def addr2line_real (self, binPath, addr, cmd=None):
         if not(self.a2lProcs.has_key(binPath)) or self.a2lProcs[binPath] is None:
@@ -147,29 +121,6 @@ class SymbolResolver:
             sourceFile = None
             lineNo = None
 
-        return (funcName, sourceFile, lineNo)
-
-
-    def addr2line_real_old1 (self, binPath, addr, cmd=None):
-        if cmd is None:
-            cmd = ["addr2line", "-e", binPath, "-f", "-C", "-j", ".text", "0x%x" % addr]
-        #print "calling a2l: %s" % cmd
-        a2lOutput = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0]
-        #print "    output: %s" % a2lOutput
-        if a2lOutput == '':
-            # a2l crashes on some libs; catch this
-            return (None, None, None)
-        lines = a2lOutput.split('\n')
-        if len(lines) != 3:
-            raise Exception("bad output from addr2line (got %d lines, expected 3); cmd: %s; output:\n%s" % (len(lines), cmd, lines))
-        funcName = lines[0]
-        if funcName == '??':
-            funcName = None
-        (sourceFile, lineNo) = lines[1].rsplit(':', 1)
-        lineNo = int(lineNo)
-        if sourceFile == '??':
-            sourceFile = None
-            lineNo = None
         return (funcName, sourceFile, lineNo)
 
     def resolve (self, addr):
@@ -211,23 +162,6 @@ class SymbolResolver:
         offsetInLib = textSectionAddr + offsetInTextSection
 
         return (libPath, funcName, sourceFile, lineNo, offsetInLib)
-
-#         readelfSummary = subprocess.Popen(["readelf", "-h", libPath], stdout=subprocess.PIPE).communicate()[0]
-#         if re.search('Type:\s+EXEC ', readelfSummary) or self.haveEuAddr2line:
-#             # executable
-#             (funcName, sourceFile, lineNo) = self.addr2line(libPath, addr)
-#             return (libPath, funcName, sourceFile, lineNo)
-#         elif re.search('Type:\s+DYN ', readelfSummary):
-#             # lib
-#             offset = addr - m[0][0]
-#             
-#             (funcName, sourceFile, lineNo) = self.addr2line(libPath, offset)
-#             return (libPath, funcName, sourceFile, lineNo)
-#         else:
-#             # unknown type
-#             raise Exception("unrecognized ELF format in '%s'" % libPath)
-
-        return (libPath, None, None, None, None)
 
 
 mappings = Mappings()
