@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <dirent.h>
 #include <vector>
+#include <algorithm>
 
 #include <wait.h>
 #include <sys/ptrace.h>
@@ -182,6 +183,7 @@ int main (int argc, char* argv[])
             tkill(allTasks[i], SIGSTOP);
         }
 
+        std::vector<int> exitedTasks;
         for (unsigned int i = 0; i < allTasks.size(); i++)
         {
             int sigNo = 0;
@@ -189,19 +191,32 @@ int main (int argc, char* argv[])
             //printf("waiting for child %d...\n", allTasks[i]);
             int waitStat = 0;
             int waitRes = waitpid(allTasks[i], &waitStat, __WALL);
-            sigNo = WSTOPSIG(waitStat);
-            if (sigNo == SIGSTOP)
+            if (WIFEXITED(waitStat))
             {
-                sigNo = 0;
+                printf("child %d exited\n", allTasks[i]);
+                exitedTasks.push_back(allTasks[i]);
             }
             else
             {
-                printf("child got signal %d\n", sigNo);
-                ptrace(PTRACE_CONT, allTasks[i], 0, sigNo);
-                continue;
+                sigNo = WSTOPSIG(waitStat);
+                if (sigNo == SIGSTOP)
+                {
+                    sigNo = 0;
+                }
+                else
+                {
+                    printf("child got signal %d\n", sigNo);
+                    ptrace(PTRACE_CONT, allTasks[i], 0, sigNo);
+                    continue;
+                }
             }
 
             //printf("child paused\n");
+        }
+
+        for (unsigned int i = 0; i < exitedTasks.size(); i++)
+        {
+            allTasks.erase(std::remove(allTasks.begin(), allTasks.end(), exitedTasks[i]), allTasks.end());
         }
 
         numSteps++;
@@ -215,6 +230,12 @@ int main (int argc, char* argv[])
         {
             ptrace(PTRACE_CONT, allTasks[i], 0, 0);
             //printf("child %d continued\n", allTasks[i]);
+        }
+
+        if (allTasks.empty())
+        {
+            printf("all tasks finished; exiting\n");
+            break;
         }
 
         usleep(sampleInterval);
