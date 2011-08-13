@@ -29,17 +29,20 @@ if __name__ == '__main__':
     res = resolver.resolve(addr)
     #print res
 
-    # result contains: (binary, function name, source file, source line number)
-    if res[1] is None:
-        print "??"
-    else:
-        print res[1]
+    # result contains: {binPath, offsetInBin, frames}
+    if res.has_key('frames'):
+        for frame in res['frames']:
+            # frame contains: (function name, source file, source line number)
+            if frame[0] is None:
+                print "??"
+            else:
+                print frame[0]
 
-    if res[2] is None:
-        sys.stdout.write("??:")
-    else:
-        sys.stdout.write(res[2]+":")
-    if res[3] is None:
-        print "??"
-    else:
-        print res[3]
+            if frame[1] is None:
+                sys.stdout.write("??:")
+            else:
+                sys.stdout.write(frame[1]+":")
+            if frame[2] is None:
+                print "??"
+            else:
+                print frame[2]

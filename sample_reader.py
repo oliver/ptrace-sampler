@@ -150,25 +150,25 @@ class SymbolResolver:
 
         m = self.mappings.find(addr)
         if m is None or m[5] is None:
-            return (None, None, None, None, None, None)
+            return {}
 
         libPath = m[5]
         if not(os.path.exists(libPath)):
-            return (libPath, None, None, None, None, None)
+            return {'binPath': libPath}
 
         offsetInBin = addr - m[0][0]
         assert(offsetInBin >= 0)
         (textSectionAddr, textSectionOffset) = self.getTextSectionOffset(libPath)
         if textSectionOffset is None:
             # can happen eg. if function is in /dev/zero...
-            return (libPath, None, None, None, None, None)
+            return {'binPath': libPath}
         assert(textSectionOffset >= 0)
         offsetInTextSection = offsetInBin - textSectionOffset
         #assert(offsetInTextSection >= 0)
 
         if offsetInTextSection < 0:
             # not sure why, but this happens sometimes
-            return (libPath, None, None, None, None, None)
+            return {'binPath': libPath}
 
         resultFrames = []
         for frame in self.addr2line(libPath, offsetInTextSection):
@@ -176,7 +176,7 @@ class SymbolResolver:
             resultFrames.append( (funcName, sourceFile, lineNo) )
         offsetInLib = textSectionAddr + offsetInTextSection
 
-        return (libPath, funcName, sourceFile, lineNo, offsetInLib, resultFrames)
+        return {'binPath': libPath, 'offsetInBin': offsetInLib, 'frames': resultFrames}
 
 
 mappings = Mappings()
@@ -217,19 +217,27 @@ def parseEvent (line):
 
         res = resolver.resolve(addr)
         #frames.append( (addr, res) )
-        if res[5]: # handle detailed list of frames
-            for f in res[5]:
+        if res.has_key('frames'): # handle detailed list of frames
+            for f in res['frames']:
                 assert(len(f) == 3)
-                frameRes = [addr] # addr
-                frameRes.append(res[0]) # binPath
+                frameRes = [addr]
+                frameRes.append(res['binPath'])
                 frameRes += list(f) # funcName, sourceFile, lineNo
-                frameRes += [res[4]] # offsetInLib
+                frameRes.append(res['offsetInBin'])
                 assert(len(frameRes) >= 6)
                 frames.append( tuple(frameRes) )
                 #print res
         else:
             frameRes = [addr]
-            frameRes += list(res)
+            if res.has_key('binPath'):
+                frameRes.append(res['binPath'])
+            else:
+                frameRes.append(None)
+            frameRes += [None] * 3
+            if res.has_key('offsetInBin'):
+                frameRes.append(res['offsetInBin'])
+            else:
+                frameRes.append(None)
             assert(len(frameRes) >= 6)
             frames.append( tuple(frameRes) )
 
