@@ -76,7 +76,7 @@ class SymbolResolver:
                 addr = int(parts[3], 16)
                 offset = int(parts[4], 16)
                 return (addr, offset)
-        return None
+        return (None, None)
 
     def addr2line (self, binPath, addr):
         debugBin = "/usr/lib/debug/%s.debug" % binPath
