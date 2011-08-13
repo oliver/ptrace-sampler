@@ -8,6 +8,7 @@ import sys
 import os
 import time
 import subprocess
+import select
 import re
 
 
@@ -89,7 +90,7 @@ class SymbolResolver:
     def addr2line_real (self, binPath, addr, cmd=None):
         if not(self.a2lProcs.has_key(binPath)) or self.a2lProcs[binPath] is None:
             # start a2l process:
-            cmd = ["addr2line", "-e", binPath, "-f", "-C", "-j", ".text"]
+            cmd = ["addr2line", "-e", binPath, "-f", "-C", "-i", "-j", ".text"]
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             self.a2lProcs[binPath] = proc
 
@@ -104,24 +105,35 @@ class SymbolResolver:
 
         proc.stdin.write("0x%x\n" % addr)
 
-        funcName = proc.stdout.readline().strip()
-        if funcName == '??':
-            funcName = None
+        lines = []
+        while True:
+            line = proc.stdout.readline()
+            if line == '':
+                os.kill(proc.pid, 15)
+                #proc.send_signal(15)
+                self.a2lProcs[binPath] = None
+                break
+            line = line.rstrip('\n\r')
+            lines.append(line)
 
-        line = proc.stdout.readline()
-        if line == '':
-            os.kill(proc.pid, 15)
-            #proc.send_signal(15)
-            self.a2lProcs[binPath] = None
-            return (funcName, None, None)
+            (rlist, wlist, xlist) = select.select([proc.stdout], [], [], 0)
+            if not(proc.stdout in rlist):
+                break
 
-        (sourceFile, lineNo) = line.strip().rsplit(':', 1)
-        lineNo = int(lineNo)
-        if sourceFile == '??':
-            sourceFile = None
-            lineNo = None
+        frames = []
+        for linePair in zip( lines[::2], lines[1::2] ):
+            funcName = linePair[0].strip()
+            if funcName == '??':
+                funcName = None
 
-        return (funcName, sourceFile, lineNo)
+            (sourceFile, lineNo) = linePair[1].strip().rsplit(':', 1)
+            lineNo = int(lineNo)
+            if sourceFile == '??':
+                sourceFile = None
+                lineNo = None
+            frames.append( (funcName, sourceFile, lineNo) )
+
+        return frames
 
     def resolve (self, addr):
         if self.resultCache.has_key(addr):
@@ -138,30 +150,33 @@ class SymbolResolver:
 
         m = self.mappings.find(addr)
         if m is None or m[5] is None:
-            return (None, None, None, None, None)
+            return (None, None, None, None, None, None)
 
         libPath = m[5]
         if not(os.path.exists(libPath)):
-            return (libPath, None, None, None, None)
+            return (libPath, None, None, None, None, None)
 
         offsetInBin = addr - m[0][0]
         assert(offsetInBin >= 0)
         (textSectionAddr, textSectionOffset) = self.getTextSectionOffset(libPath)
         if textSectionOffset is None:
             # can happen eg. if function is in /dev/zero...
-            return (libPath, None, None, None, None)
+            return (libPath, None, None, None, None, None)
         assert(textSectionOffset >= 0)
         offsetInTextSection = offsetInBin - textSectionOffset
         #assert(offsetInTextSection >= 0)
 
         if offsetInTextSection < 0:
             # not sure why, but this happens sometimes
-            return (libPath, None, None, None, None)
+            return (libPath, None, None, None, None, None)
 
-        (funcName, sourceFile, lineNo) = self.addr2line(libPath, offsetInTextSection)
+        resultFrames = []
+        for frame in self.addr2line(libPath, offsetInTextSection):
+            (funcName, sourceFile, lineNo) = frame
+            resultFrames.append( (funcName, sourceFile, lineNo) )
         offsetInLib = textSectionAddr + offsetInTextSection
 
-        return (libPath, funcName, sourceFile, lineNo, offsetInLib)
+        return (libPath, funcName, sourceFile, lineNo, offsetInLib, resultFrames)
 
 
 mappings = Mappings()
@@ -202,11 +217,21 @@ def parseEvent (line):
 
         res = resolver.resolve(addr)
         #frames.append( (addr, res) )
-        frameRes = [addr]
-        if res:
+        if res[5]: # handle detailed list of frames
+            for f in res[5]:
+                assert(len(f) == 3)
+                frameRes = [addr] # addr
+                frameRes.append(res[0]) # binPath
+                frameRes += list(f) # funcName, sourceFile, lineNo
+                frameRes += [res[4]] # offsetInLib
+                assert(len(frameRes) >= 6)
+                frames.append( tuple(frameRes) )
+                #print res
+        else:
+            frameRes = [addr]
             frameRes += list(res)
-        frames.append( tuple(frameRes) )
-        #print res
+            assert(len(frameRes) >= 6)
+            frames.append( tuple(frameRes) )
 
 #         if res[1] is not None:
 #             # show function name
