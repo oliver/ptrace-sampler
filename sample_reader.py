@@ -92,7 +92,7 @@ class Disassembler:
         if table.has_key(retAddr):
             return table[retAddr]
         else:
-            print "no matching call site found for 0x%08x in %s"
+            print "no matching call site found for 0x%08x in %s" % (retAddr, binPath)
             #raise Exception("not found: 0x%08x in %s" % (retAddr, binPath))
             return retAddr
 
