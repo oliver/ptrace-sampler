@@ -90,7 +90,7 @@ class SymbolResolver:
     def addr2line_real (self, binPath, addr, cmd=None):
         if not(self.a2lProcs.has_key(binPath)) or self.a2lProcs[binPath] is None:
             # start a2l process:
-            cmd = ["addr2line", "-e", binPath, "-f", "-C", "-i", "-j", ".text"]
+            cmd = ["addr2line", "-e", binPath, "-f", "-C", "-i"]
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             self.a2lProcs[binPath] = proc
 
@@ -170,11 +170,11 @@ class SymbolResolver:
             # not sure why, but this happens sometimes
             return {'binPath': libPath}
 
+        offsetInLib = textSectionAddr + offsetInTextSection
         resultFrames = []
-        for frame in self.addr2line(libPath, offsetInTextSection):
+        for frame in self.addr2line(libPath, offsetInLib):
             (funcName, sourceFile, lineNo) = frame
             resultFrames.append( (funcName, sourceFile, lineNo) )
-        offsetInLib = textSectionAddr + offsetInTextSection
 
         return {'binPath': libPath, 'offsetInBin': offsetInLib, 'frames': resultFrames}
 
