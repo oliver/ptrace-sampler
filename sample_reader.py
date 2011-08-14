@@ -46,6 +46,57 @@ class Mappings:
         return None
 
 
+class Disassembler:
+    def __init__ (self):
+        self.tables = {}
+
+    def _disassembleBin (self, binPath):
+        'generates a table mapping from an address to the address of the preceding (call) instruction'
+        callTable = {}
+        #print "disassembling %s ..." % binPath
+        objdumpOutput = subprocess.Popen(["objdump", "-d", "-w", "-z", binPath], stdout=subprocess.PIPE).communicate()[0]
+
+        #print "parsing objdump output ..."
+        prevAddr = None
+        for line in objdumpOutput.split('\n'):
+            if not(line.startswith(' ')):
+                continue
+
+            line = line[1:] # strip leading space
+            (lineAddr, bytes, decoded) = line.split('\t')
+            lineAddr = lineAddr.rstrip(':')
+            lineAddr = int(lineAddr, 16)
+            instr = decoded.split()[0]
+            #print "0x%08x: %s|%s|%s" % (lineAddr, bytes, decoded, instr)
+
+            if prevAddr is not None:
+                callTable[lineAddr] = prevAddr
+
+            if instr == 'call':
+                prevAddr = lineAddr
+            else:
+                prevAddr = None
+
+        #print "...done"
+        return callTable
+
+    def findCallAddress (self, retAddr, binPath):
+        "tries to find the call instruction that belongs to a given return target address"
+
+        if not(self.tables.has_key(binPath)):
+            table = self._disassembleBin(binPath)
+            self.tables[binPath] = table
+        else:
+            table = self.tables[binPath]
+
+        if table.has_key(retAddr):
+            return table[retAddr]
+        else:
+            print "no matching call site found for 0x%08x in %s"
+            #raise Exception("not found: 0x%08x in %s" % (retAddr, binPath))
+            return retAddr
+
+
 class SymbolResolver:
     # this is just a pile of hacks, based on looking at output from readelf and addr2line...
 
@@ -57,6 +108,8 @@ class SymbolResolver:
         self.a2lProcs = {} # holds a list of running addr2line processes (indexed by binPath)
 
         self.textSectionOffsetCache = {}
+        
+        self.disassembler = Disassembler()
 
     def getTextSectionOffset (self, binPath):
         if self.textSectionOffsetCache.has_key(binPath):
@@ -135,16 +188,20 @@ class SymbolResolver:
 
         return frames
 
-    def resolve (self, addr):
+    def resolve (self, addr, fixAddress=False):
         if self.resultCache.has_key(addr):
             return self.resultCache[addr]
         else:
-            res = self._resolveUncached(addr)
+            res = self._resolveUncached(addr, fixAddress)
             self.resultCache[addr] = res
             return res
 
-    def _resolveUncached (self, addr):
-        """ Returns (lib, function, source file, line number, lib-local function address) tuple """
+    def _resolveUncached (self, addr, fixAddress):
+        """
+        Returns (lib, function, source file, line number, lib-local function address) tuple
+        If fixAddress is True, the address is treated as return address, and the matching
+        call instruction is searched and resolved instead.
+        """
 
         assert(addr >= 0)
 
@@ -171,6 +228,9 @@ class SymbolResolver:
             return {'binPath': libPath}
 
         offsetInLib = textSectionAddr + offsetInTextSection
+        if fixAddress:
+            offsetInLib = self.disassembler.findCallAddress(offsetInLib, libPath)
+
         resultFrames = []
         for frame in self.addr2line(libPath, offsetInLib):
             (funcName, sourceFile, lineNo) = frame
@@ -212,10 +272,12 @@ def parseEvent (line):
             regs[ k[2:] ] = int(v, 16)
 
     frames = []
+    addrIndex = 0
     for f in stacktrace.split():
         addr = int(f, 16)
 
-        res = resolver.resolve(addr)
+        addrIndex+=1
+        res = resolver.resolve(addr, fixAddress=(addrIndex > 1))
         #frames.append( (addr, res) )
         if res.has_key('frames'): # handle detailed list of frames
             for f in res['frames']:
