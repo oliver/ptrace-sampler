@@ -97,6 +97,66 @@ class Disassembler:
             return retAddr
 
 
+class NmResolver:
+    """ Resolve an address by using "nm" command line tool """
+    def __init__ (self):
+        self.nmTables = {}
+
+    def resolve (self, binPath, addr):
+        "addr must be the offset in the binary"
+
+        debugBin = "/usr/lib/debug/%s.debug" % binPath
+        res = None
+        if os.path.exists(debugBin):
+            res = self.resolve_real(debugBin, addr)
+        if res is None or res[0] is None:
+            res = self.resolve_real(binPath, addr)
+        return res
+
+    def _getNmTable (self, binPath):
+        nmOutput = subprocess.Popen(["nm", "-A", "-C", "-l", "-n", binPath], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0]
+        #print "running nm on %s" % binPath
+
+        table = []
+        for line in nmOutput.split('\n'):
+            #print "line: '%s'" % line
+            if not(line):
+                continue
+
+            if line.find('\t') >= 0:
+                (prefix, sourceLoc) = line.split('\t', 1)
+                (sourceFile, lineNo) = sourceLoc.split(':', 1)
+                lineNo = int(lineNo)
+            else:
+                prefix = line
+                sourceFile = None
+                lineNo = None
+
+            (binLoc, typ, funcName) = prefix.split(' ', 2)
+            (parsedBinPath, parsedAddr) = binLoc.split(':', 1)
+            if parsedAddr:
+                parsedAddr = int(parsedAddr, 16)
+                table.append( (parsedAddr, funcName, sourceFile, lineNo) )
+        return table
+
+    def resolve_real (self, binPath, addr):
+        #print "looking for 0x%08x in %s" % (addr, binPath)
+
+        if not(self.nmTables.has_key(binPath)):
+            table = self._getNmTable(binPath)
+            self.nmTables[binPath] = table
+        else:
+            table = self.nmTables[binPath]
+
+        lastLine = (None, None, None)
+        for e in table:
+            if e[0] > addr:
+                # lastLine now contains the match
+                break
+            lastLine = e[1:]
+        return lastLine
+
+
 class SymbolResolver:
     # this is just a pile of hacks, based on looking at output from readelf and addr2line...
 
@@ -110,6 +170,7 @@ class SymbolResolver:
         self.textSectionOffsetCache = {}
         
         self.disassembler = Disassembler()
+        self.nmResolver = NmResolver()
 
     def getTextSectionOffset (self, binPath):
         if self.textSectionOffsetCache.has_key(binPath):
@@ -234,6 +295,9 @@ class SymbolResolver:
         resultFrames = []
         for frame in self.addr2line(libPath, offsetInLib):
             (funcName, sourceFile, lineNo) = frame
+            if funcName is None:
+                # try fall back to "nm" if addr2line can't resolve the function name
+                (funcName, dummy, dummy) = self.nmResolver.resolve(libPath, offsetInLib)
             resultFrames.append( (funcName, sourceFile, lineNo) )
 
         return {'binPath': libPath, 'offsetInBin': offsetInLib, 'frames': resultFrames}
