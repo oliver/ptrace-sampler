@@ -12,6 +12,9 @@ import select
 import re
 
 from lib_finder import LibFinder
+from cacher import Cacher
+
+cache = Cacher()
 
 
 class Mappings:
@@ -54,6 +57,11 @@ class Disassembler:
 
     def _disassembleBin (self, binPath):
         'generates a table mapping from an address to the address of the preceding (call) instruction'
+
+        data = cache.get('disas', binPath)
+        if data is not None:
+            return data
+
         callTable = {}
         #print "disassembling %s ..." % binPath
         objdumpOutput = subprocess.Popen(["objdump", "-d", "-w", "-z", binPath], stdout=subprocess.PIPE).communicate()[0]
@@ -80,6 +88,7 @@ class Disassembler:
                 prevAddr = None
 
         #print "...done"
+        cache.store('disas', binPath, callTable)
         return callTable
 
     def findCallAddress (self, retAddr, binPath):
