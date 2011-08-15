@@ -11,6 +11,8 @@ import subprocess
 import select
 import re
 
+from lib_finder import LibFinder
+
 
 class Mappings:
     def __init__ (self):
@@ -99,19 +101,15 @@ class Disassembler:
 
 class NmResolver:
     """ Resolve an address by using "nm" command line tool """
-    def __init__ (self):
+    def __init__ (self, libFinder):
+        self.libFinder = libFinder
         self.nmTables = {}
 
     def resolve (self, binPath, addr):
-        "addr must be the offset in the binary"
+        "addr must be offsetInLib"
 
-        debugBin = "/usr/lib/debug/%s.debug" % binPath
-        res = None
-        if os.path.exists(debugBin):
-            res = self.resolve_real(debugBin, addr)
-        if res is None or res[0] is None:
-            res = self.resolve_real(binPath, addr)
-        return res
+        debugPath = self.libFinder.findDebugBin(binPath)
+        return self.resolve_real(debugPath, addr)
 
     def _getNmTable (self, binPath):
         nmOutput = subprocess.Popen(["nm", "-A", "-C", "-l", "-n", binPath], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0]
@@ -169,8 +167,9 @@ class SymbolResolver:
 
         self.textSectionOffsetCache = {}
         
+        self.libFinder = LibFinder()
         self.disassembler = Disassembler()
-        self.nmResolver = NmResolver()
+        self.nmResolver = NmResolver(self.libFinder)
 
     def getTextSectionOffset (self, binPath):
         if self.textSectionOffsetCache.has_key(binPath):
@@ -193,13 +192,8 @@ class SymbolResolver:
         return (None, None)
 
     def addr2line (self, binPath, addr):
-        debugBin = "/usr/lib/debug/%s.debug" % binPath
-        res = None
-        if os.path.exists(debugBin):
-            res = self.addr2line_real(debugBin, addr)
-        if res is None or res[0] is None:
-            res = self.addr2line_real(binPath, addr)
-        return res
+        debugBin = self.libFinder.findDebugBin(binPath)
+        return self.addr2line_real(debugBin, addr)
 
     def addr2line_real (self, binPath, addr, cmd=None):
         if not(self.a2lProcs.has_key(binPath)) or self.a2lProcs[binPath] is None:
