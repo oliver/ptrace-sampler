@@ -5,6 +5,9 @@ import binascii
 import struct
 
 class LibFinder:
+    def __init__ (self):
+        self.resultCache = {}
+
     def _getDebugLink (self, binPath):
         objdumpOutput = subprocess.Popen(["objdump", "-s", "-w", "-j", ".gnu_debuglink", binPath], stdout=subprocess.PIPE).communicate()[0]
 
@@ -39,7 +42,14 @@ class LibFinder:
 
     def findDebugBin (self, binPath):
         "Returns the path of an external debuginfo library (if available)"
+        if self.resultCache.has_key(binPath):
+            return self.resultCache[binPath]
+        else:
+            res = self._findDebugBin_uncached(binPath)
+            self.resultCache[binPath] = res
+            return res
 
+    def _findDebugBin_uncached (self, binPath):
         (debugName, debugCrc) = self._getDebugLink(binPath)
         if debugName is None:
             debugName = os.path.basename(binPath)
