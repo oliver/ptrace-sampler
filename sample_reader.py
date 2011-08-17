@@ -238,9 +238,6 @@ class SymbolResolver:
         return (None, None)
 
     def addr2line (self, binPath, section, addr):
-        return self.addr2line_real(binPath, section, addr)
-
-    def addr2line_real (self, binPath, section, addr, cmd=None):
         processKey = (binPath, section)
         if not(self.a2lProcs.has_key(processKey)) or self.a2lProcs[processKey] is None:
             # start a2l process:
