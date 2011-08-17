@@ -172,13 +172,50 @@ class SymbolResolver:
         self.mapFile = None
         self.resultCache = {}
 
-        self.a2lProcs = {} # holds a list of running addr2line processes (indexed by binPath)
+        self.a2lProcs = {} # holds a list of running addr2line processes (indexed by (binPath,section))
 
         self.textSectionOffsetCache = {}
         
         self.libFinder = LibFinder()
         self.disassembler = Disassembler()
         self.nmResolver = NmResolver(self.libFinder)
+
+    def _getSections (self, binPath):
+        sections = []
+        #print "reading section list from %s ..." % binPath
+        readelfOutput = subprocess.Popen(["readelf", "-S", binPath], stdout=subprocess.PIPE).communicate()[0]
+        for line in readelfOutput.split('\n'):
+            if not(line.startswith('  [')):
+                continue
+            line = line.lstrip(' [')
+
+            parts = line.split(None, 7)
+            (index, name, typ, address, offset, size, es, remainder) = parts
+            flags = remainder[:3]
+            if not('A' in flags):
+                # section has no memory allocated in process image
+                continue
+
+            address = int(address, 16)
+            offset = int(offset, 16)
+            sections.append( (name, address, offset) )
+        #print "... done (%d sections)" % len(sections)
+        return sections
+
+    def _findSection (self, binPath, addr):
+        """
+        Determine section in which the address is located.
+        Returns (sectionName, sectionAddress, sectionOffset) tuple.
+        """
+
+        sections = self._getSections(binPath)
+        lastSection = (None, None, None)
+        for s in sections:
+            (name, address, offset) = s
+            if offset > addr: # this assumes that readelf prints section list sorted by offset
+                break
+            lastSection = (name, address, offset)
+        return lastSection
 
     def getTextSectionOffset (self, binPath):
         if self.textSectionOffsetCache.has_key(binPath):
@@ -200,18 +237,18 @@ class SymbolResolver:
                 return (addr, offset)
         return (None, None)
 
-    def addr2line (self, binPath, addr):
-        debugBin = self.libFinder.findDebugBin(binPath)
-        return self.addr2line_real(debugBin, addr)
+    def addr2line (self, binPath, section, addr):
+        return self.addr2line_real(binPath, section, addr)
 
-    def addr2line_real (self, binPath, addr, cmd=None):
-        if not(self.a2lProcs.has_key(binPath)) or self.a2lProcs[binPath] is None:
+    def addr2line_real (self, binPath, section, addr, cmd=None):
+        processKey = (binPath, section)
+        if not(self.a2lProcs.has_key(processKey)) or self.a2lProcs[processKey] is None:
             # start a2l process:
-            cmd = ["addr2line", "-e", binPath, "-f", "-C", "-i"]
+            cmd = ["addr2line", "-e", binPath, "-f", "-C", "-i", "-j", section]
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-            self.a2lProcs[binPath] = proc
+            self.a2lProcs[processKey] = proc
 
-        proc = self.a2lProcs[binPath]
+        proc = self.a2lProcs[processKey]
 
         #if not(self.a2lProcs.has_key(binPath)):
         proc.poll()
@@ -273,37 +310,47 @@ class SymbolResolver:
         if m is None or m[5] is None:
             return {}
 
-        libPath = m[5]
-        if not(os.path.exists(libPath)):
-            return {'binPath': libPath}
+        actualBin = m[5]
+        if not(os.path.exists(actualBin)):
+            return {'binPath': actualBin}
 
-        offsetInBin = addr - m[0][0]
-        assert(offsetInBin >= 0)
-        (textSectionAddr, textSectionOffset) = self.getTextSectionOffset(libPath)
-        if textSectionOffset is None:
+        # offset into the memory mapped for this binary
+        offsetInBinMemory = addr - m[0][0]
+        assert(offsetInBinMemory >= 0)
+
+        # these values are the same for actual bin and for separate debug bin:
+        (sectionName, sectionAddr, sectionOffset) = self._findSection(actualBin, offsetInBinMemory)
+
+        if sectionOffset is None:
             # can happen eg. if function is in /dev/zero...
-            return {'binPath': libPath}
-        assert(textSectionOffset >= 0)
-        offsetInTextSection = offsetInBin - textSectionOffset
-        #assert(offsetInTextSection >= 0)
+            return {'binPath': actualBin}
+        assert(sectionOffset >= 0)
+        offsetInSection = offsetInBinMemory - sectionOffset
+        assert(offsetInSection >= 0)
 
-        if offsetInTextSection < 0:
-            # not sure why, but this happens sometimes
-            return {'binPath': libPath}
+        # this is the offset of the return address into the actual binary
+        # note: this offset is not necessarily correct for external debug bins
+        offsetInActualBin = sectionAddr + offsetInSection
+        assert(offsetInActualBin >= 0)
 
-        offsetInLib = textSectionAddr + offsetInTextSection
         if fixAddress:
-            offsetInLib = self.disassembler.findCallAddress(offsetInLib, libPath)
+            newOffsetInActualBin = self.disassembler.findCallAddress(offsetInActualBin, actualBin)
+            offsetDelta = offsetInActualBin - newOffsetInActualBin
+            offsetInSection -= offsetDelta
+            offsetInActualBin = newOffsetInActualBin
+
+        # find separate debug bin (if available)
+        debugBin = self.libFinder.findDebugBin(actualBin)
 
         resultFrames = []
-        for frame in self.addr2line(libPath, offsetInLib):
+        for frame in self.addr2line(debugBin, sectionName, offsetInSection):
             (funcName, sourceFile, lineNo) = frame
             if funcName is None:
                 # try fall back to "nm" if addr2line can't resolve the function name
-                (funcName, dummy, dummy) = self.nmResolver.resolve(libPath, offsetInLib)
+                (funcName, dummy, dummy) = self.nmResolver.resolve(actualBin, offsetInActualBin)
             resultFrames.append( (funcName, sourceFile, lineNo) )
 
-        return {'binPath': libPath, 'offsetInBin': offsetInLib, 'frames': resultFrames}
+        return {'binPath': actualBin, 'offsetInBin': offsetInActualBin, 'frames': resultFrames}
 
 
 mappings = Mappings()
