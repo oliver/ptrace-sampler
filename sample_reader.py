@@ -287,11 +287,12 @@ class SymbolResolver:
         return frames
 
     def resolve (self, addr, fixAddress=False):
-        if self.resultCache.has_key(addr):
-            return self.resultCache[addr]
+        cacheKey = (addr, fixAddress)
+        if self.resultCache.has_key(cacheKey):
+            return self.resultCache[cacheKey]
         else:
             res = self._resolveUncached(addr, fixAddress)
-            self.resultCache[addr] = res
+            self.resultCache[cacheKey] = res
             return res
 
     def _resolveUncached (self, addr, fixAddress):
