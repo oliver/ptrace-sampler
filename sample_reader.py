@@ -121,7 +121,7 @@ class NmResolver:
         return self.resolve_real(debugPath, addr)
 
     def _getNmTable (self, binPath):
-        nmOutput = subprocess.Popen(["nm", "-A", "-C", "-l", "-n", binPath], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0]
+        nmOutput = subprocess.Popen(["nm", "-A", "-C", "-a", "--synthetic", "-l", "-n", binPath], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0]
         #print "running nm on %s" % binPath
 
         table = []
