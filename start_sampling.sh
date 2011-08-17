@@ -18,3 +18,8 @@ tracefile=/tmp/trace-$arg-`date +%Y%m%d-%H%M%S`-$pid.txt
 ./ptrace-sampler $pid 2>$tracefile
 echo "wrote $tracefile:"
 ls -lh $tracefile
+
+./samples2calltree.py $tracefile
+calltree=calltree.`basename $tracefile`
+ls -lh $calltree
+kcachegrind $calltree &
