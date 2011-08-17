@@ -181,6 +181,10 @@ class SymbolResolver:
         self.nmResolver = NmResolver(self.libFinder)
 
     def _getSections (self, binPath):
+        sections = cache.get('sections', binPath, useDisk=False)
+        if sections is not None:
+            return sections
+
         sections = []
         #print "reading section list from %s ..." % binPath
         readelfOutput = subprocess.Popen(["readelf", "-S", binPath], stdout=subprocess.PIPE).communicate()[0]
@@ -199,6 +203,7 @@ class SymbolResolver:
             address = int(address, 16)
             offset = int(offset, 16)
             sections.append( (name, address, offset) )
+        cache.store('sections', binPath, sections, useDisk=False)
         #print "... done (%d sections)" % len(sections)
         return sections
 

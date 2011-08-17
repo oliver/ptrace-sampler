@@ -10,6 +10,9 @@ class Cacher:
     """
 
     def __init__ (self):
+
+        self.memCache = {}
+
         if os.environ.has_key('XDG_CACHE_HOME') and os.environ['XDG_CACHE_HOME']:
             self.basePath = os.path.join(os.environ['XDG_CACHE_HOME'], 'ptrace-sampler')
         else:
@@ -18,13 +21,20 @@ class Cacher:
             os.mkdir(self.basePath)
         assert(os.path.isdir(self.basePath))
 
-    def get (self, typ, path):
+    def get (self, typ, path, useDisk=True):
         """
         Returns the cached data of given type for the specified path.
         If the specified file has a newer ctime or mtime or if its CRC doesn't
         match the one stored in the cache file, or if there is no matching
         cache file at all, None is returned.
         """
+
+        memKey = (typ, path)
+        if self.memCache.has_key(memKey):
+            return self.memCache[memKey]
+
+        if not(useDisk):
+            return None
 
         assert(os.path.isfile(path))
         realStat = os.stat(path)
@@ -45,19 +55,24 @@ class Cacher:
 
             if ftyp == typ and fpath == path and fcrc == realCrc and ftimestamp >= realTimestamp:
                 fd = open(filePath, 'rb')
-                return pickle.load(fd)
+                data = pickle.load(fd)
+                self.memCache[memKey] = data
+                return data
         return None
 
-    def store (self, typ, path, data):
+    def store (self, typ, path, data, useDisk=True):
         """
         Adds the given data of given type as cache item for the given path.
         """
-        self._invalidate(typ, path)
+        self.memCache[ (typ, path) ] = data
 
-        cacheFile = self._getFilename(typ, path)
-        fd = open(cacheFile, 'wb')
-        pickle.dump(data, fd)
-        fd.close()
+        if useDisk:
+            self._invalidate(typ, path)
+
+            cacheFile = self._getFilename(typ, path)
+            fd = open(cacheFile, 'wb')
+            pickle.dump(data, fd)
+            fd.close()
 
     def _invalidate (self, typ, path):
         "removes all outdated cache entries of the given type for the given path"
