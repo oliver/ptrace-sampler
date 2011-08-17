@@ -87,3 +87,16 @@ class Cacher:
             else:
                 res += c
         return res
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) != 3:
+        print "Usage: %s <type> <path>" % sys.argv[0]
+        sys.exit(1)
+
+    cache = Cacher()
+    data = cache.get(sys.argv[1], sys.argv[2])
+    if data is None:
+        print "no cached data found"
+    else:
+        print "found cached data; type: %s; length: %d" % (type(data), len(data))
