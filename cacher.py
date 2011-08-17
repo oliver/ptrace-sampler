@@ -68,10 +68,22 @@ class Cacher:
     def _getFilename (self, typ, path):
         assert(os.path.isfile(path))
         crc = self._calcCrc(path)
-        fileName = '%s_%s_%08x.cache' % (urllib.quote(typ, safe=''), urllib.quote(path, safe=''), crc)
+        fileName = '%s_%s_%08x.cache' % (self._urlquote(typ), self._urlquote(path), crc)
         return os.path.join(self.basePath, fileName)
 
     def _calcCrc (self, path):
         fd = open(path, 'rb')
         return (binascii.crc32(fd.read()) & 0xffffffff)
 
+    def _urlquote (self, s):
+        "Like urllib.quote, but quotes all characters except for letters and numbers"
+        res = ''
+        for c in s:
+            if not(
+                (c >= 'a' and c <= 'z') or
+                (c >= 'A' and c <= 'Z') or
+                (c >= '0' and c <= '9')):
+                res += '%%%02x' % ord(c)
+            else:
+                res += c
+        return res
