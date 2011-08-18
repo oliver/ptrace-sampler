@@ -18,7 +18,7 @@ class Cacher:
         else:
             self.basePath = os.path.expanduser('~/.cache/ptrace-sampler/')
         if not(os.path.exists(self.basePath)):
-            os.mkdir(self.basePath)
+            os.makedirs(self.basePath)
         assert(os.path.isdir(self.basePath))
 
     def get (self, typ, path, useDisk=True):
