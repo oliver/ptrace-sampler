@@ -201,11 +201,12 @@ int main (int argc, char* argv[])
     {
         char line[500];
         fgets(line, 500, mapFd);
-        fprintf(outFile, "M: %s", line);
         if (feof(mapFd))
         {
             break;
         }
+
+        fprintf(outFile, "M: %s", line);
     }
 
     int64_t numSteps = 0;
