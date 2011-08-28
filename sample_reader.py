@@ -121,6 +121,10 @@ class NmResolver:
         return self.resolve_real(debugPath, addr)
 
     def _getNmTable (self, binPath):
+        table = cache.get('nmsymbols', binPath, useDisk=False)
+        if table is not None:
+            return table
+
         nmOutput = subprocess.Popen(["nm", "-A", "-C", "-a", "--synthetic", "-l", "-n", binPath], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0]
         #print "running nm on %s" % binPath
 
@@ -144,6 +148,7 @@ class NmResolver:
             if parsedAddr:
                 parsedAddr = int(parsedAddr, 16)
                 table.append( (parsedAddr, funcName, sourceFile, lineNo) )
+        cache.store('nmsymbols', binPath, table, useDisk=False)
         return table
 
     def resolve_real (self, binPath, addr):
