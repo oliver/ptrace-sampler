@@ -43,8 +43,50 @@ void CreateSample (const int pid)
 
     const int ip = regs.eip;
     const int bp = regs.ebp;
+    const int sp = regs.esp;
 
     fprintf(outFile, "%08x ", ip);
+
+    // Check if eip is in function prolog (ie. when ebp is not updated yet),
+    // and use esp in that case to get eip of calling frame.
+    // Similarly, detect if eip is in function epilog (ie. when ebp is already
+    // updated for return to caller), and again fall back to esp in that case.
+    {
+        const unsigned int instrBytes = ptrace(PTRACE_PEEKTEXT, pid, ip, 0);
+        int retAddrAddr = 0; /// address (on stack) where return address is stored
+        // prolog (as observed in the wild):
+        //   55      push %ebp
+        //   89 e5   mov %esp,%ebp
+        if ((instrBytes & 0xFFFFFF) == 0xe58955)
+        {
+            // eip is at "push %ebp", and return address (ie. eip of calling function)
+            // is stored at (esp) now
+            retAddrAddr = sp;
+        }
+        else if ((instrBytes & 0xFFFF) == 0xe589)
+        {
+            // eip is at "mov %esp,%ebp", and return address is stored at (esp+4) now
+            retAddrAddr = sp + 4;
+        }
+
+        // epilog (as observed in the wild):
+        //   c3   ret
+        else if ((instrBytes & 0xFF) == 0xc3)
+        {
+            // eip is at "ret"; we assume that the previous instruction ("leave" or "pop %ebp")
+            // has prepared ebp for calling function, and that stack
+            // (and hence esp) have been cleaned up.
+            // So, only return address should be on stack now.
+            retAddrAddr = sp;
+        }
+
+        if (retAddrAddr != 0)
+        {
+            // simply insert an additional frame for the calling function
+            const int retAddr = ptrace(PTRACE_PEEKDATA, pid, retAddrAddr, 0);
+	        fprintf(outFile, "%08x ", retAddr);
+        }
+    }
 
     int oldBp = bp;
     for (int i = 1; i < 40; i++)
