@@ -267,7 +267,7 @@ class SymbolResolver:
             if line == '':
                 os.kill(proc.pid, 15)
                 #proc.send_signal(15)
-                self.a2lProcs[binPath] = None
+                self.a2lProcs[processKey] = None
                 break
             line = line.rstrip('\n\r')
             lines.append(line)
