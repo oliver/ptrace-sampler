@@ -64,11 +64,11 @@ class Disassembler:
 
         callTable = {}
         #print "disassembling %s ..." % binPath
-        objdumpOutput = subprocess.Popen(["objdump", "-d", "-w", "-z", binPath], stdout=subprocess.PIPE).communicate()[0]
+        objdumpProc = subprocess.Popen(["objdump", "-d", "-w", "-z", binPath], stdout=subprocess.PIPE)
 
         #print "parsing objdump output ..."
         prevAddr = None
-        for line in objdumpOutput.split('\n'):
+        for line in objdumpProc.stdout:
             if not(line.startswith(' ')):
                 continue
 
@@ -125,11 +125,11 @@ class NmResolver:
         if table is not None:
             return table
 
-        nmOutput = subprocess.Popen(["nm", "-A", "-C", "-a", "--synthetic", "-l", "-n", binPath], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0]
+        nmProc = subprocess.Popen(["nm", "-A", "-C", "-a", "--synthetic", "-l", "-n", binPath], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         #print "running nm on %s" % binPath
 
         table = []
-        for line in nmOutput.split('\n'):
+        for line in nmProc.stdout:
             #print "line: '%s'" % line
             if not(line):
                 continue
@@ -192,8 +192,8 @@ class SymbolResolver:
 
         sections = []
         #print "reading section list from %s ..." % binPath
-        readelfOutput = subprocess.Popen(["readelf", "-S", binPath], stdout=subprocess.PIPE).communicate()[0]
-        for line in readelfOutput.split('\n'):
+        readelfProc = subprocess.Popen(["readelf", "-S", binPath], stdout=subprocess.PIPE)
+        for line in readelfProc.stdout:
             if not(line.startswith('  [')):
                 continue
             line = line.lstrip(' [')
@@ -236,8 +236,8 @@ class SymbolResolver:
             return res
 
     def _getTextSectionOffset_real (self, binPath):
-        readelfOutput = subprocess.Popen(["readelf", "-S", binPath], stdout=subprocess.PIPE).communicate()[0]
-        for line in readelfOutput.split('\n'):
+        readelfProc = subprocess.Popen(["readelf", "-S", binPath], stdout=subprocess.PIPE)
+        for line in readelfProc.stdout:
             #m = re.match(r'\s*\[\d+\]\s+\.text\s*')
             line = line.lstrip(' [')
             parts = line.split()
