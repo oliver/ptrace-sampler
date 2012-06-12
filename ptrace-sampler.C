@@ -34,8 +34,24 @@ FILE* outFile = stderr;
 /// if true, use heuristic to find next stack frame if frame pointer has been omitted
 bool useFpoHeuristic = true;
 
+/// if true, debug messages will be printed
+bool debugEnabled = false;
+
 unsigned int stackStart = 0;
 unsigned int stackEnd = 0;
+
+
+static char* Timestamp ()
+{
+	static char timeStr[50];
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	sprintf(timeStr, "%d.%06d", int(tv.tv_sec), int(tv.tv_usec));
+	return timeStr;
+}
+
+#define DEBUG(...) if (debugEnabled) { printf("[%s] ", Timestamp()); printf(__VA_ARGS__); printf("\n"); }
+
 
 void CreateSample (const int pid)
 {
@@ -280,7 +296,7 @@ int main (int argc, char* argv[])
     {
         if (terminate)
         {
-            printf("terminate requested\n");
+            DEBUG("terminate requested");
             ptrace(PTRACE_CONT, pid, 0, 0);
             break;
         }
@@ -288,7 +304,7 @@ int main (int argc, char* argv[])
         // interrupt child
         for (unsigned int i = 0; i < allTasks.size(); i++)
         {
-            //printf("sending SIGSTOP to %d...\n", allTasks[i]);
+            DEBUG("sending SIGSTOP to %d...", allTasks[i]);
             tkill(allTasks[i], SIGSTOP);
         }
 
@@ -297,12 +313,12 @@ int main (int argc, char* argv[])
         {
             int sigNo = 0;
 
-            //printf("waiting for child %d...\n", allTasks[i]);
+            DEBUG("waiting for child %d...", allTasks[i]);
             int waitStat = 0;
             int waitRes = waitpid(allTasks[i], &waitStat, __WALL);
             if (WIFEXITED(waitStat))
             {
-                printf("child %d exited\n", allTasks[i]);
+                DEBUG("child %d exited\n", allTasks[i]);
                 exitedTasks.push_back(allTasks[i]);
             }
             else
@@ -314,13 +330,13 @@ int main (int argc, char* argv[])
                 }
                 else
                 {
-                    printf("child got signal %d\n", sigNo);
+                    DEBUG("child got signal %d", sigNo);
                     ptrace(PTRACE_CONT, allTasks[i], 0, sigNo);
                     continue;
                 }
             }
 
-            //printf("child paused\n");
+            DEBUG("child %d paused (waitRes: %d; waitStat: %d)", allTasks[i], waitRes, waitStat);
         }
 
         for (unsigned int i = 0; i < exitedTasks.size(); i++)
@@ -338,12 +354,12 @@ int main (int argc, char* argv[])
         for (unsigned int i = 0; i < allTasks.size(); i++)
         {
             ptrace(PTRACE_CONT, allTasks[i], 0, 0);
-            //printf("child %d continued\n", allTasks[i]);
+            DEBUG("child %d continued", allTasks[i]);
         }
 
         if (allTasks.empty())
         {
-            printf("all tasks finished; exiting\n");
+            DEBUG("all tasks finished; exiting");
             break;
         }
 
