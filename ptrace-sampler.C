@@ -31,6 +31,12 @@ int ipoffs, spoffs, bpoffs;
 
 FILE* outFile = stderr;
 
+/// if true, use heuristic to find next stack frame if frame pointer has been omitted
+bool useFpoHeuristic = true;
+
+unsigned int stackStart = 0;
+unsigned int stackEnd = 0;
+
 void CreateSample (const int pid)
 {
     struct timeval tv;
@@ -41,9 +47,9 @@ void CreateSample (const int pid)
     ptrace(PTRACE_GETREGS, pid, 0, &regs);
     fprintf(outFile, "E: t=%d.%06d;p=%d;r_oeax=%x\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.orig_eax);
 
-    const int ip = regs.eip;
-    const int bp = regs.ebp;
-    const int sp = regs.esp;
+    const unsigned int ip = regs.eip;
+    const unsigned int bp = regs.ebp;
+    const unsigned int sp = regs.esp;
 
     fprintf(outFile, "%08x ", ip);
 
@@ -88,11 +94,59 @@ void CreateSample (const int pid)
         }
     }
 
-    int oldBp = bp;
+    unsigned int oldBp = bp;
+    unsigned int lastGoodSp = sp;
+        
     for (int i = 1; i < 40; i++)
     {
-	    const int newBp = ptrace(PTRACE_PEEKDATA, pid, oldBp, 0);
-	    const int newIp = ptrace(PTRACE_PEEKDATA, pid, oldBp+4, 0);
+        if (useFpoHeuristic && (oldBp < stackStart || oldBp > stackEnd) && (lastGoodSp >= stackStart && lastGoodSp <= stackEnd))
+        {
+            //printf("bp 0x%x is outside of stack\n", oldBp);
+            fprintf(outFile, "*"); // add mark that this frame was missing frame pointer
+
+            /*
+            EBP does not point to a location on stack; so we assume there is
+            no frame pointer saved here.
+            Use heuristic to find a frame with stack pointer again:
+            - search stack downwards, starting at ESP (ie. incrementing addresses)
+            - look for bytes which form a valid address on stack
+            - check if pointed-to stack location contains another valid stack pointer
+              and a valid IP pointer
+            */
+
+            unsigned int currAddr = lastGoodSp;
+            while (currAddr < stackEnd)
+            {
+                const unsigned int stackValue = ptrace(PTRACE_PEEKDATA, pid, currAddr, 0);
+                if (stackValue >= stackStart && stackValue <= stackEnd)
+                {
+                    //printf("found candidate 0x%x , at ESP + %d\n", stackValue, currAddr - sp);
+
+                    // check if pointed-to location on stack appears to be a valid stack frame:
+                    const unsigned int candidateBp = stackValue;
+                    const unsigned int candidateSubBp = ptrace(PTRACE_PEEKDATA, pid, candidateBp, 0);
+                    //const unsigned int candidateSubIp = ptrace(PTRACE_PEEKDATA, pid, candidateBp+4, 0);
+                    //printf("candidate EBP gives frame with EBP 0x%x and EIP 0x%x\n", candidateSubBp, candidateSubIp);
+
+                    if (candidateSubBp >= stackStart && candidateSubBp <= stackEnd)
+                    {
+                        //printf("candidate appears good\n");
+                        oldBp = candidateBp;
+                        fprintf(outFile, "+"); // add mark that next is a successfully reconstructed frame
+                        break;
+                    }
+                }
+                currAddr++;
+            }
+            //printf("stack heuristic finished\n");
+            fprintf(outFile, " ");
+        }
+
+        lastGoodSp = oldBp;
+
+	    const unsigned int newBp = ptrace(PTRACE_PEEKDATA, pid, oldBp, 0);
+	    const unsigned int newIp = ptrace(PTRACE_PEEKDATA, pid, oldBp+4, 0);
+
 	    fprintf(outFile, "%08x ", newIp);
 	    oldBp = newBp;
 	    if (newBp == 0x0 /*|| newBp == 0xFFFFFFFF*/)
@@ -200,6 +254,7 @@ int main (int argc, char* argv[])
     while (true)
     {
         char line[500];
+        memset(line, '\0', sizeof(line));
         fgets(line, 500, mapFd);
         if (feof(mapFd))
         {
@@ -207,6 +262,17 @@ int main (int argc, char* argv[])
         }
 
         fprintf(outFile, "M: %s", line);
+
+        if (strncmp(line+49, "[stack]", 7) == 0)
+        {
+            stackStart = strtoll(line, NULL, 16);
+            stackEnd = strtoll(line+9, NULL, 16);
+        }
+    }
+
+    if (useFpoHeuristic)
+    {
+        printf("stack start: 0x%x; end: 0x%x; size: %d\n", int(stackStart), int(stackEnd), int(stackEnd - stackStart));
     }
 
     int64_t numSteps = 0;

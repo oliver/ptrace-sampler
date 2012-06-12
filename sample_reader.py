@@ -396,6 +396,11 @@ def parseEvent (line):
     frames = []
     addrIndex = 0
     for f in stacktrace.split():
+        if f[0] == '*':
+            # special note
+            if f != '*+':
+                print "(stack frame could not be reconstructed)"
+            continue
         addr = int(f, 16)
 
         addrIndex+=1
