@@ -1,6 +1,6 @@
 
 
-BIN=app1 app2 app4 ptrace-singlestep ptrace-sampler
+BIN=app1 app2 app4 app11-sigchld ptrace-singlestep ptrace-sampler
 
 all: $(BIN)
 
