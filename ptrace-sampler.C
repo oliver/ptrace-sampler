@@ -134,17 +134,20 @@ void CreateSample (const int pid)
             while (currAddr < stackEnd)
             {
                 const unsigned int stackValue = ptrace(PTRACE_PEEKDATA, pid, currAddr, 0);
-                if (stackValue >= stackStart && stackValue <= stackEnd)
+                if (stackValue >= stackStart && stackValue <= stackEnd && stackValue > currAddr)
                 {
                     //printf("found candidate 0x%x , at ESP + %d\n", stackValue, currAddr - sp);
 
                     // check if pointed-to location on stack appears to be a valid stack frame:
                     const unsigned int candidateBp = stackValue;
+                    const unsigned int candidateIp = ptrace(PTRACE_PEEKDATA, pid, currAddr+4, 0);
                     const unsigned int candidateSubBp = ptrace(PTRACE_PEEKDATA, pid, candidateBp, 0);
                     //const unsigned int candidateSubIp = ptrace(PTRACE_PEEKDATA, pid, candidateBp+4, 0);
                     //printf("candidate EBP gives frame with EBP 0x%x and EIP 0x%x\n", candidateSubBp, candidateSubIp);
 
-                    if (candidateSubBp >= stackStart && candidateSubBp <= stackEnd)
+                    if (candidateSubBp >= stackStart && candidateSubBp <= stackEnd
+                        && candidateSubBp > candidateBp
+                        && candidateIp != 0x0 && candidateIp != 0xffffffff)
                     {
                         //printf("candidate appears good\n");
                         oldBp = candidateBp;
