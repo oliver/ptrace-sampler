@@ -41,7 +41,14 @@ unsigned int stackStart = 0;
 unsigned int stackEnd = 0;
 
 
-static char* Timestamp ()
+static int64_t TimestampUsec ()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return int64_t(tv.tv_sec) * 1000000 + tv.tv_usec;
+}
+
+static char* TimestampString ()
 {
 	static char timeStr[50];
 	struct timeval tv;
@@ -50,7 +57,7 @@ static char* Timestamp ()
 	return timeStr;
 }
 
-#define DEBUG(...) if (debugEnabled) { printf("[%s] ", Timestamp()); printf(__VA_ARGS__); printf("\n"); }
+#define DEBUG(...) if (debugEnabled) { printf("[%s] ", TimestampString()); printf(__VA_ARGS__); printf("\n"); }
 
 
 void CreateSample (const int pid)
@@ -188,6 +195,12 @@ static void SignalHandler (int sig)
     terminate = true;
 }
 
+static void SigchldHandler (int sig)
+{
+    // ignore signal
+    DEBUG("ignoring SIGCHLD (%d)", sig);
+}
+
 int main (int argc, char* argv[])
 {
     if (argc != 2)
@@ -204,6 +217,7 @@ int main (int argc, char* argv[])
 
     signal(SIGINT, SignalHandler);
     signal(SIGTERM, SignalHandler);
+    signal(SIGCHLD, SigchldHandler);
 
     fprintf(outFile, "# trace file from %s\n", argv[0]);
     fprintf(outFile, "# for PID %d\n", pid);
@@ -294,7 +308,10 @@ int main (int argc, char* argv[])
         printf("stack start: 0x%x; end: 0x%x; size: %d\n", int(stackStart), int(stackEnd), int(stackEnd - stackStart));
     }
 
+
+    DEBUG("starting loop");
     int64_t numSteps = 0;
+    int64_t lastSample = 0;
     while (true)
     {
         if (terminate)
@@ -304,60 +321,107 @@ int main (int argc, char* argv[])
             break;
         }
 
-        // interrupt child
-        for (unsigned int i = 0; i < allTasks.size(); i++)
-        {
-            DEBUG("sending SIGSTOP to %d...", allTasks[i]);
-            tkill(allTasks[i], SIGSTOP);
-        }
+        std::vector<int> stopSigs; ///< for each thread: the signal that caused it to stop
+        stopSigs.resize(allTasks.size(), -1);
 
         std::vector<int> exitedTasks;
-        for (unsigned int i = 0; i < allTasks.size(); i++)
-        {
-            int sigNo = 0;
 
-            DEBUG("waiting for child %d...", allTasks[i]);
-            int waitStat = 0;
-            int waitRes = waitpid(allTasks[i], &waitStat, __WALL);
-            if (WIFEXITED(waitStat))
+        const int64_t nowTime = TimestampUsec();
+        if (lastSample + sampleInterval < nowTime)
+        {
+            // time for new sample
+            lastSample = nowTime;
+
+            // ensure all children are stopped
+            for (unsigned int i = 0; i < allTasks.size(); i++)
             {
-                DEBUG("child %d exited\n", allTasks[i]);
-                exitedTasks.push_back(allTasks[i]);
+                DEBUG("sending SIGSTOP to %d...", allTasks[i]);
+                tkill(allTasks[i], SIGSTOP);
             }
-            else
+
+            for (unsigned int i = 0; i < allTasks.size(); i++)
             {
-                sigNo = WSTOPSIG(waitStat);
-                if (sigNo == SIGSTOP)
+                DEBUG("waiting for child %d...", allTasks[i]);
+                int waitStat = 0;
+                const int waitRes = waitpid(allTasks[i], &waitStat, __WALL);
+                DEBUG("waitpid finished (waitRes: %d; waitStat: %d; WIFEXITED: %d; WIFSTOPPED: %d; WSTOPSIG: %d)",
+                    waitRes, waitStat, WIFEXITED(waitStat), WIFSTOPPED(waitStat), WSTOPSIG(waitStat));
+                if (WIFEXITED(waitStat))
                 {
-                    sigNo = 0;
+                    DEBUG("child %d exited\n", allTasks[i]);
+                    exitedTasks.push_back(allTasks[i]);
                 }
                 else
                 {
-                    DEBUG("child got signal %d", sigNo);
-                    ptrace(PTRACE_CONT, allTasks[i], 0, sigNo);
-                    continue;
+                    int sigNo = WSTOPSIG(waitStat);
+                    if (sigNo == SIGSTOP)
+                    {
+                        sigNo = 0;
+                    }
+                    else
+                    {
+                        DEBUG("child got signal %d", sigNo);
+                    }
+                    stopSigs[i] = sigNo;
                 }
+
+                DEBUG("child %d paused", allTasks[i]);
             }
 
-            DEBUG("child %d paused (waitRes: %d; waitStat: %d)", allTasks[i], waitRes, waitStat);
+            // create sample
+            numSteps++;
+
+            DEBUG("creating sample #%lld", numSteps);
+            const int64_t sampleStartTime = TimestampUsec();
+            for (unsigned int i = 0; i < allTasks.size(); i++)
+            {
+                CreateSample(allTasks[i]);
+            }
+            DEBUG("sampling %d thread(s) took %lld usec", allTasks.size(), TimestampUsec() - sampleStartTime);
+        }
+        else
+        {
+            // ignore unwanted wakeup
+            DEBUG("unexpected wakeup");
+        }
+
+        // continue all children
+        for (unsigned int i = 0; i < allTasks.size(); i++)
+        {
+            int tryCount = 0;
+            while (true)
+            {
+                tryCount++;
+
+                int stopSig = stopSigs[i];
+                if (stopSig == -1)
+                {
+                    // if we haven't obtained any stop reason from waitpid() above,
+                    // call waitpid() here to get the first reason in queue:
+                    int waitStat = 0;
+                    const int waitRes = waitpid(allTasks[i], &waitStat, WNOHANG);
+                    DEBUG("obtained stop reason for child %d (waitRes: %d; waitStat: %d; WIFEXITED: %d; WIFSTOPPED: %d; WSTOPSIG: %d)",
+                        allTasks[i], waitRes, waitStat, WIFEXITED(waitStat), WIFSTOPPED(waitStat), WSTOPSIG(waitStat));
+                    stopSig = WSTOPSIG(waitStat);
+                }
+
+                // Apparently there is no reliable way here to find out
+                // whether child is stopped and needs to be continued...
+                // So just call PTRACE_CONT until it fails.
+                const int success = ptrace(PTRACE_CONT, allTasks[i], 0, stopSig);
+                DEBUG("child %d continued with signal %d (try #%d; success: %d; errno: %d)", allTasks[i], stopSig, tryCount, success, errno);
+                if (success != 0)
+                {
+                    break;
+                }
+
+                stopSigs[i] = 0; // for further PTRACE_CONT tries use 0 as stopSig
+            }
         }
 
         for (unsigned int i = 0; i < exitedTasks.size(); i++)
         {
             allTasks.erase(std::remove(allTasks.begin(), allTasks.end(), exitedTasks[i]), allTasks.end());
-        }
-
-        numSteps++;
-
-        for (unsigned int i = 0; i < allTasks.size(); i++)
-        {
-            CreateSample(allTasks[i]);
-        }
-
-        for (unsigned int i = 0; i < allTasks.size(); i++)
-        {
-            ptrace(PTRACE_CONT, allTasks[i], 0, 0);
-            DEBUG("child %d continued", allTasks[i]);
         }
 
         if (allTasks.empty())
@@ -366,8 +430,14 @@ int main (int argc, char* argv[])
             break;
         }
 
-        usleep(sampleInterval);
+        const int64_t remaining = (lastSample + sampleInterval) - nowTime;
+        DEBUG("sleeping for %lld usec", remaining);
+        if (remaining > 0)
+        {
+            usleep(remaining);
+        }
     }
+
     printf("exiting after %lld single-steps\n", numSteps);
 
     return 0;
