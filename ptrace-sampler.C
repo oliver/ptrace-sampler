@@ -69,7 +69,7 @@ void CreateSample (const int pid)
     struct user_regs_struct regs;
     memset(&regs, 0x00, sizeof(regs));
     ptrace(PTRACE_GETREGS, pid, 0, &regs);
-    fprintf(outFile, "E: t=%d.%06d;p=%d;r_oeax=%x\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.orig_eax);
+    fprintf(outFile, "E: t=%d.%06d;p=%d;r_oeax=%lx\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.orig_eax);
 
     const unsigned int ip = regs.eip;
     const unsigned int bp = regs.ebp;
@@ -201,7 +201,7 @@ typedef std::vector<TaskInfo> TaskList;
 
 
 bool terminate = false;
-static void SignalHandler (int sig)
+static void SignalHandler (int /*sig*/)
 {
     terminate = true;
 }
