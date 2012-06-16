@@ -25,11 +25,6 @@
 // Sampling Functions
 //
 
-#define M_OFFSETOF(STRUCT, ELEMENT) \
-	(unsigned int) &((STRUCT *)NULL)->ELEMENT;
-
-int ipoffs, spoffs, bpoffs;
-
 FILE* outFile = stderr;
 
 /// if true, use heuristic to find next stack frame if frame pointer has been omitted
@@ -221,10 +216,6 @@ int main (int argc, char* argv[])
     }
     const int pid = atoi(argv[1]);
     int sampleInterval = 5 * 1000; // usec
-
-    ipoffs = M_OFFSETOF(struct user, regs.eip);
-	spoffs = M_OFFSETOF(struct user, regs.esp);
-	bpoffs = M_OFFSETOF(struct user, regs.ebp);
 
     signal(SIGINT, SignalHandler);
     signal(SIGTERM, SignalHandler);
