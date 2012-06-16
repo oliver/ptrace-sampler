@@ -217,7 +217,8 @@ static void Usage (const char* argv0)
     printf("Usage: %s\n\
     --pid <pid>\n\
     [--interval | -i <msec>]\n\
-    [--max-frames | -m <max. number frames to trace back>]\n\
+    [--max-samples | -s <max. number of samples to collect>]\n\
+    [--max-frames | -f <max. number of frames to trace back>]\n\
     [--fpo | --no-fpo]\n\
     [--debug | -d | --no-debug]\n", argv0);
 }
@@ -226,6 +227,7 @@ int main (int argc, char* argv[])
 {
     int pid = -1;
     int sampleInterval = 5 * 1000; // usec
+    int maxSamples = 0;
 
     for (int i = 1; i < argc; i++)
     {
@@ -239,7 +241,12 @@ int main (int argc, char* argv[])
             sampleInterval = atoi(argv[i+1]) * 1000;
             i++;
         }
-        else if ((strcmp(argv[i], "--max-frames") == 0 || strcmp(argv[i], "-m") == 0) && i < argc-1)
+        else if ((strcmp(argv[i], "--max-samples") == 0 || strcmp(argv[i], "-s") == 0) && i < argc-1)
+        {
+            maxSamples = atoi(argv[i+1]);
+            i++;
+        }
+        else if ((strcmp(argv[i], "--max-frames") == 0 || strcmp(argv[i], "-f") == 0) && i < argc-1)
         {
             maxFrames = atoi(argv[i+1]);
             i++;
@@ -381,7 +388,7 @@ int main (int argc, char* argv[])
 
 
     DEBUG("starting loop");
-    int64_t numSteps = 0;
+    int64_t numSamples = 0;
     int64_t lastSample = 0;
     while (true)
     {
@@ -442,9 +449,9 @@ int main (int argc, char* argv[])
             }
 
             // create sample
-            numSteps++;
+            numSamples++;
 
-            DEBUG("creating sample #%lld", numSteps);
+            DEBUG("creating sample #%lld", numSamples);
             const int64_t sampleStartTime = TimestampUsec();
             for (unsigned int i = 0; i < allTasks.size(); i++)
             {
@@ -522,6 +529,12 @@ int main (int argc, char* argv[])
             break;
         }
 
+        if (maxSamples > 0 && numSamples >= maxSamples)
+        {
+            DEBUG("max. requested samples (%d) reached; exiting", maxSamples);
+            break;
+        }
+
         const int64_t remaining = (lastSample + sampleInterval) - nowTime;
         DEBUG("sleeping for %lld usec", remaining);
         if (remaining > 0)
@@ -530,7 +543,7 @@ int main (int argc, char* argv[])
         }
     }
 
-    printf("exiting after %lld single-steps\n", numSteps);
+    printf("exiting after taking %lld samples\n", numSamples);
 
     return 0;
 }
