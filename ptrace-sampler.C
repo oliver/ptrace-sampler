@@ -17,6 +17,10 @@
 #include <sys/user.h>
 #include <sys/reg.h>
 
+#ifdef HAVE_LIBUNWIND
+#include <libunwind-ptrace.h>
+#endif
+
 // from https://bugzilla.redhat.com/attachment.cgi?id=263751&action=edit :
 #include <asm/unistd.h>
 #define tkill(tid, sig) syscall (__NR_tkill, (tid), (sig))
@@ -60,7 +64,53 @@ static char* TimestampString ()
 #define DEBUG(...) if (debugEnabled) { printf("[%s] ", TimestampString()); printf(__VA_ARGS__); printf("\n"); }
 
 
-void CreateSample (const int pid)
+#ifdef HAVE_LIBUNWIND
+void CreateSampleLibunwind (const int pid, unw_addr_space_t targetAddrSpace, void* uptInfo)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    struct user_regs_struct regs;
+    memset(&regs, 0x00, sizeof(regs));
+    ptrace(PTRACE_GETREGS, pid, 0, &regs);
+    fprintf(outFile, "E: t=%d.%06d;p=%d;r_oeax=%lx\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.orig_eax);
+
+    unw_cursor_t cursor;
+    const int success = unw_init_remote(&cursor, targetAddrSpace, uptInfo);
+    if (success != 0)
+    {
+        printf("unw_init_remote failed: %d\n", success);
+    }
+    else
+    {
+        for (int i = 0; i < maxFrames; i++)
+        {
+            unw_word_t ip;
+            const int regResult = unw_get_reg(&cursor, UNW_REG_IP, &ip);
+            if (regResult != 0)
+            {
+                printf("unw_get_reg failed (%d)\n", regResult);
+            }
+            fprintf(outFile, "%08x ", ip);
+
+            const int stepResult = unw_step(&cursor);
+            if (stepResult == 0)
+            {
+                break;
+            }
+            else if (stepResult < 0)
+            {
+                printf("unw_step failed (%d)\n", stepResult);
+            }
+        }
+
+        fprintf(outFile, "\n");
+    }
+}
+#endif
+
+
+void CreateSampleFramepointer (const int pid)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -195,6 +245,10 @@ struct TaskInfo
 {
     int pid;
     int stopSignal; ///< the signal that caused the task to stop
+
+#ifdef HAVE_LIBUNWIND
+    void* uptInfo;
+#endif
 };
 typedef std::vector<TaskInfo> TaskList;
 
@@ -220,6 +274,7 @@ static void Usage (const char* argv0)
     [--max-samples | -s <max. number of samples to collect>]\n\
     [--max-frames | -f <max. number of frames to trace back>]\n\
     [--fpo | --no-fpo]\n\
+    [--unwind | -u | --framepointer | -fp]\n\
     [--debug | -d | --no-debug]\n", argv0);
 }
 
@@ -228,6 +283,7 @@ int main (int argc, char* argv[])
     int pid = -1;
     int sampleInterval = 5 * 1000; // usec
     int maxSamples = 0;
+    bool useLibunwind = false;
 
     for (int i = 1; i < argc; i++)
     {
@@ -259,6 +315,14 @@ int main (int argc, char* argv[])
         {
             useFpoHeuristic = false;
         }
+        else if (strcmp(argv[i], "--unwind") == 0 || strcmp(argv[i], "-u") == 0)
+        {
+            useLibunwind = true;
+        }
+        else if (strcmp(argv[i], "--framepointer") == 0 || strcmp(argv[i], "-fp") == 0)
+        {
+            useLibunwind = false;
+        }
         else if (strcmp(argv[i], "--debug") == 0 || strcmp(argv[i], "-d") == 0)
         {
             debugEnabled = true;
@@ -288,6 +352,14 @@ int main (int argc, char* argv[])
         Usage(argv[0]);
         exit(1);
     }
+
+#ifndef HAVE_LIBUNWIND
+    if (useLibunwind)
+    {
+        printf("support for --unwind is not available\n");
+        exit(1);
+    }
+#endif
 
     signal(SIGINT, SignalHandler);
     signal(SIGTERM, SignalHandler);
@@ -328,6 +400,9 @@ int main (int argc, char* argv[])
             TaskInfo ti;
             ti.pid = taskId;
             ti.stopSignal = -1;
+#ifdef HAVE_LIBUNWIND
+            ti.uptInfo = NULL;
+#endif
             allTasks.push_back(ti);
         }
     }
@@ -357,6 +432,18 @@ int main (int argc, char* argv[])
         ptrace(PTRACE_CONT, allTasks[i].pid, 0, 0);
     }
 
+#ifdef HAVE_LIBUNWIND
+    unw_addr_space_t targetAddrSpace = 0;
+
+    if (useLibunwind)
+    {
+     	targetAddrSpace = unw_create_addr_space(&_UPT_accessors, 0);
+     	for (unsigned int i = 0; i < allTasks.size(); i++)
+     	{
+     	    allTasks[i].uptInfo = _UPT_create(allTasks[i].pid);
+ 	    }
+ 	}
+#endif
 
     // save mappings of child (required for address->line conversion later)
     char mapFileName[200];
@@ -381,7 +468,7 @@ int main (int argc, char* argv[])
         }
     }
 
-    if (useFpoHeuristic)
+    if (useFpoHeuristic && !useLibunwind)
     {
         printf("stack start: 0x%x; end: 0x%x; size: %d\n", int(stackStart), int(stackEnd), int(stackEnd - stackStart));
     }
@@ -457,7 +544,16 @@ int main (int argc, char* argv[])
             {
                 if (exitedTasks.empty() || exitedTasks.find(allTasks[i].pid) == exitedTasks.end())
                 {
-                    CreateSample(allTasks[i].pid);
+#ifdef HAVE_LIBUNWIND
+                    if (useLibunwind)
+                    {
+                        CreateSampleLibunwind(allTasks[i].pid, targetAddrSpace, allTasks[i].uptInfo);
+                    }
+                    else
+#endif
+                    {
+                        CreateSampleFramepointer(allTasks[i].pid);
+                    }
                 }
             }
             DEBUG("sampling %d thread(s) took %lld usec", allTasks.size(), TimestampUsec() - sampleStartTime);
@@ -544,6 +640,17 @@ int main (int argc, char* argv[])
     }
 
     printf("exiting after taking %lld samples\n", numSamples);
+
+#ifdef HAVE_LIBUNWIND
+    if (useLibunwind)
+    {
+        for (unsigned int i = 0; i < allTasks.size(); i++)
+        {
+            _UPT_destroy(allTasks[i].uptInfo);
+            allTasks[i].uptInfo = NULL;
+        }
+    }
+#endif
 
     return 0;
 }
