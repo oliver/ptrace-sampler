@@ -210,7 +210,10 @@ static void SigchldHandler (int sig)
 
 static void Usage (const char* argv0)
 {
-    printf("Usage: %s --pid <pid> [--interval <msec>]\n", argv0);
+    printf("Usage: %s\n\
+    --pid <pid>\n\
+    [--interval <msec>]\n\
+    [-d|--debug|--no-debug]\n", argv0);
 }
 
 int main (int argc, char* argv[])
@@ -229,6 +232,14 @@ int main (int argc, char* argv[])
         {
             sampleInterval = atoi(argv[i+1]) * 1000;
             i++;
+        }
+        else if (strcmp(argv[i], "--debug") == 0 || strcmp(argv[i], "-d") == 0)
+        {
+            debugEnabled = true;
+        }
+        else if (strcmp(argv[i], "--no-debug") == 0)
+        {
+            debugEnabled = false;
         }
         else
         {
