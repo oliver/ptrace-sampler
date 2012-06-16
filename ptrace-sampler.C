@@ -413,14 +413,15 @@ int main (int argc, char* argv[])
         printf("attaching to PID %d\n", allTasks[i].pid);
         if (ptrace(PTRACE_ATTACH, allTasks[i].pid, 0, 0) != 0)
         {
-            perror("attach failed");
+            printf("failed to attach to PID %d: %s\n", allTasks[i].pid, strerror(errno));
+            exit(1);
         }
 
         int waitStat = 0;
-        int waitRes = waitpid(allTasks[i].pid, &waitStat, WUNTRACED | __WALL);
+        const int waitRes = waitpid(allTasks[i].pid, &waitStat, WUNTRACED | __WALL);
         if (waitRes != allTasks[i].pid || !WIFSTOPPED(waitStat))
         {
-            printf("unexpected waitpid result '%d' for PID %d!\n", waitStat, waitRes);
+            printf("unexpected waitpid result %d for PID %d; waitStat: %d\n", waitRes, allTasks[i].pid, waitStat);
             exit(1);
         }
         printf("waitpid result: pid=%d, stat=%d\n", waitRes, waitStat);
