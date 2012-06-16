@@ -213,6 +213,7 @@ static void Usage (const char* argv0)
     printf("Usage: %s\n\
     --pid <pid>\n\
     [--interval <msec>]\n\
+    [--fpo|--no-fpo]\n\
     [-d|--debug|--no-debug]\n", argv0);
 }
 
@@ -232,6 +233,14 @@ int main (int argc, char* argv[])
         {
             sampleInterval = atoi(argv[i+1]) * 1000;
             i++;
+        }
+        else if (strcmp(argv[i], "--fpo") == 0)
+        {
+            useFpoHeuristic = true;
+        }
+        else if (strcmp(argv[i], "--no-fpo") == 0)
+        {
+            useFpoHeuristic = false;
         }
         else if (strcmp(argv[i], "--debug") == 0 || strcmp(argv[i], "-d") == 0)
         {
