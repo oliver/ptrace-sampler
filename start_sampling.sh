@@ -8,6 +8,16 @@ if [ $? == 0 ]; then
     pid=$arg
 else
     pid=`pgrep $arg`
+    numProcs=`echo $pid | wc -w`
+    if [ "x$numProcs" == "x0" ]; then
+        echo "no process matching '$arg'"
+        exit 1
+    fi
+
+    if [ "x$numProcs" != "x1" ]; then
+        echo "$numProcs processes matching '$arg'"
+        exit 1
+    fi
 fi
 
 [ "x$pid" == "x" ] && exit 1
