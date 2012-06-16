@@ -33,6 +33,10 @@ bool useFpoHeuristic = true;
 /// if true, debug messages will be printed
 bool debugEnabled = false;
 
+/// max. number of stack frames to trace back
+int maxFrames = 40;
+
+
 unsigned int stackStart = 0;
 unsigned int stackEnd = 0;
 
@@ -116,7 +120,7 @@ void CreateSample (const int pid)
     unsigned int oldBp = bp;
     unsigned int lastGoodSp = sp;
         
-    for (int i = 1; i < 40; i++)
+    for (int i = 1; i < maxFrames; i++)
     {
         if (useFpoHeuristic && (oldBp < stackStart || oldBp > stackEnd) && (lastGoodSp >= stackStart && lastGoodSp <= stackEnd))
         {
@@ -212,9 +216,10 @@ static void Usage (const char* argv0)
 {
     printf("Usage: %s\n\
     --pid <pid>\n\
-    [--interval <msec>]\n\
-    [--fpo|--no-fpo]\n\
-    [-d|--debug|--no-debug]\n", argv0);
+    [--interval | -i <msec>]\n\
+    [--max-frames | -m <max. number frames to trace back>]\n\
+    [--fpo | --no-fpo]\n\
+    [--debug | -d | --no-debug]\n", argv0);
 }
 
 int main (int argc, char* argv[])
@@ -232,6 +237,11 @@ int main (int argc, char* argv[])
         else if ((strcmp(argv[i], "--interval") == 0 || strcmp(argv[i], "-i") == 0) && i < argc-1)
         {
             sampleInterval = atoi(argv[i+1]) * 1000;
+            i++;
+        }
+        else if ((strcmp(argv[i], "--max-frames") == 0 || strcmp(argv[i], "-m") == 0) && i < argc-1)
+        {
+            maxFrames = atoi(argv[i+1]);
             i++;
         }
         else if (strcmp(argv[i], "--fpo") == 0)
