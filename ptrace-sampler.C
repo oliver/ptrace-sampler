@@ -207,15 +207,50 @@ static void SigchldHandler (int sig)
     DEBUG("ignoring SIGCHLD (%d)", sig);
 }
 
+
+static void Usage (const char* argv0)
+{
+    printf("Usage: %s --pid <pid> [--interval <msec>]\n", argv0);
+}
+
 int main (int argc, char* argv[])
 {
-    if (argc != 2)
+    int pid = -1;
+    int sampleInterval = 5 * 1000; // usec
+
+    for (int i = 1; i < argc; i++)
     {
-        printf("Usage: %s <pid>\n", argv[0]);
+        if (strcmp(argv[i], "--pid") == 0 && i < argc-1)
+        {
+            pid = atoi(argv[i+1]);
+            i++;
+        }
+        else if ((strcmp(argv[i], "--interval") == 0 || strcmp(argv[i], "-i") == 0) && i < argc-1)
+        {
+            sampleInterval = atoi(argv[i+1]) * 1000;
+            i++;
+        }
+        else
+        {
+            printf("unknown parameter '%s'\n", argv[i]);
+            Usage(argv[0]);
+            exit(1);
+        }
+    }
+
+    if (pid <= 0)
+    {
+        printf("no valid PID specified\n");
+        Usage(argv[0]);
         exit(1);
     }
-    const int pid = atoi(argv[1]);
-    int sampleInterval = 5 * 1000; // usec
+
+    if (sampleInterval <= 0)
+    {
+        printf("invalid sample interval '%d' specified (must be > 0)\n", sampleInterval);
+        Usage(argv[0]);
+        exit(1);
+    }
 
     signal(SIGINT, SignalHandler);
     signal(SIGTERM, SignalHandler);

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 arg=$1
+shift
 
 ps -p $arg &> /dev/null
 if [ $? == 0 ]; then
@@ -25,9 +26,15 @@ fi
 
 echo "attaching to '$arg' (PID $pid)"
 tracefile=/tmp/trace-$arg-`date +%Y%m%d-%H%M%S`-$pid.txt
-./ptrace-sampler $pid 2>$tracefile
+./ptrace-sampler --pid $pid $* 2>$tracefile
+res=$?
 echo "wrote $tracefile:"
 ls -lh $tracefile
+
+if [ "x$res" != "x0" ]; then
+    echo "sampling failed"
+    exit $res
+fi
 
 ./samples2calltree.py $tracefile
 calltree=calltree.`basename $tracefile`
