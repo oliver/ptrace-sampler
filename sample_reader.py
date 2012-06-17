@@ -125,7 +125,7 @@ class NmResolver:
         if table is not None:
             return table
 
-        nmProc = subprocess.Popen(["nm", "-A", "-C", "-a", "--synthetic", "-l", "-n", binPath], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        nmProc = subprocess.Popen(["nm", "-A", "-C", "-a", "--synthetic", "-n", binPath], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         #print "running nm on %s" % binPath
 
         table = []
