@@ -44,6 +44,9 @@ int maxFrames = 40;
 unsigned int stackStart = 0;
 unsigned int stackEnd = 0;
 
+unsigned int vdsoStart = 0;
+unsigned int vdsoEnd = 0;
+
 
 static int64_t TimestampUsec ()
 {
@@ -122,7 +125,7 @@ void CreateSampleFramepointer (const int pid)
     fprintf(outFile, "E: t=%d.%06d;p=%d;r_oeax=%lx\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.orig_eax);
 
     const unsigned int ip = regs.eip;
-    const unsigned int bp = regs.ebp;
+    unsigned int bp = regs.ebp;
     const unsigned int sp = regs.esp;
 
     fprintf(outFile, "%08x ", ip);
@@ -158,6 +161,66 @@ void CreateSampleFramepointer (const int pid)
             // (and hence esp) have been cleaned up.
             // So, only return address should be on stack now.
             retAddrAddr = sp;
+        }
+
+        else if (ip >= vdsoStart && ip <= vdsoEnd)
+        {
+            // Workaround for non-standard stack frame layout in __kernel_vsyscall (from VDSO)
+            //
+            // The __kernel_vsyscall function contains code to make a syscall.
+            // It is contained in the "vdso" section in memory, which is
+            // injected into the process memory by the kernel.
+            //
+            // I've found that the __kernel_vsyscall function usually looks like this:
+            //   51      push   %ecx
+            //   52      push   %edx
+            //   55      push   %ebp
+            //   89 e5   mov    %esp,%ebp
+            //   0f 34   sysenter
+            //   ...
+            //   5d   pop %ebp
+            //   5a   pop %edx
+            //   59   pop %ecx
+            //   c3   ret
+            //
+            // As EBP is not saved to stack right at the beginning, it doesn't
+            // contain an actual "base pointer", so the usual stack walking
+            // won't work here. Hence, this workaround is used to get the
+            // location of return address and to adjust the bp value used
+            // for further stack walking.
+
+            // TODO: add same workaround for other prolog instructions in __kernel_vsyscall
+            if ((instrBytes & 0xFFFF) == 0x340f)
+            {
+                // eip is at "sysenter".
+                // ebp and edx and ecx and return address should be on stack now.
+                retAddrAddr = sp + 12;
+                // use bp from stack:
+                bp = ptrace(PTRACE_PEEKDATA, pid, sp, 0);
+            }
+
+            else if (instrBytes == 0xc3595a5d)
+            {
+                // eip is at "pop %ebx".
+                // ebp and edx and ecx and return address should be on stack now.
+                retAddrAddr = sp + 12;
+                // use bp from stack:
+                bp = ptrace(PTRACE_PEEKDATA, pid, sp, 0);
+            }
+            else if ((instrBytes & 0xFFFFFF) == 0xc3595a)
+            {
+                // eip is at "pop %edx".
+                // edx and ecx and return address should be on stack now.
+                // bp should be popped from stack already.
+                retAddrAddr = sp + 8;
+            }
+            else if ((instrBytes & 0xFFFF) == 0xc359)
+            {
+                // eip is at "pop %ecx".
+                // ecx and return address should be on stack now.
+                // bp should be popped from stack already.
+                retAddrAddr = sp + 4;
+            }
         }
 
         if (retAddrAddr != 0)
@@ -468,12 +531,19 @@ int main (int argc, char* argv[])
             stackStart = strtoll(line, NULL, 16);
             stackEnd = strtoll(line+9, NULL, 16);
         }
+        if (strncmp(line+49, "[vdso]", 6) == 0)
+        {
+            vdsoStart = strtoll(line, NULL, 16);
+            vdsoEnd = strtoll(line+9, NULL, 16);
+        }
     }
 
     if (useFpoHeuristic && !useLibunwind)
     {
         printf("stack start: 0x%x; end: 0x%x; size: %d\n", int(stackStart), int(stackEnd), int(stackEnd - stackStart));
     }
+
+    printf("vdso start: 0x%x; end: 0x%x; size: %d\n", vdsoStart, vdsoEnd, int(vdsoEnd - vdsoStart));
 
 
     DEBUG("starting loop");
