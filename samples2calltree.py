@@ -65,7 +65,7 @@ def handleEvent (e):
             if f[1] is not None:
                 funcName += "_" + os.path.basename(f[1])
         lineNo = f[4]
-        if lineNo is None: lineNo = 0
+        if lineNo is None or lineNo <= 0: lineNo = 1
         fileName = f[3]
         if fileName is None: fileName = '???'
         # TODO: try to fix address (it currently usually points to _next_ instruction)
