@@ -297,6 +297,25 @@ class SymbolResolver:
         return frames
 
     def resolve (self, addr, fixAddress=False):
+        """
+        Returns dict with the following values:
+        - binPath: path to binary which contains the address
+        - offsetInBin: offset of address in binPath
+        - frames: list of call frames for specified address; for each frame,
+          contains a tuple of (function name, source file path, line number)
+
+        The "frames" list usually contains only one entry; but if the address is
+        inside an inlined function, multiple frames might be returned.
+
+        All of the dict entries are optional and will be missing if the value
+        could not be determined.
+        In the frames list, a frame tuple will contain None for any value
+        which could not be determined.
+
+        If fixAddress is True, addr is treated as return address, and the matching
+        call instruction is searched and resolved instead.
+        """
+
         cacheKey = (addr, fixAddress)
         if self.resultCache.has_key(cacheKey):
             return self.resultCache[cacheKey]
@@ -306,16 +325,11 @@ class SymbolResolver:
             return res
 
     def _resolveUncached (self, addr, fixAddress):
-        """
-        Returns (lib, function, source file, line number, lib-local function address) tuple
-        If fixAddress is True, the address is treated as return address, and the matching
-        call instruction is searched and resolved instead.
-        """
-
         assert(addr >= 0)
 
         m = self.mappings.find(addr)
         if m is None or m[5] is None:
+            # addr is not in any mapped range
             return {}
 
         actualBin = m[5]
