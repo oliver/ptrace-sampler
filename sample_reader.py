@@ -116,9 +116,7 @@ class NmResolver:
 
     def resolve (self, binPath, addr):
         "addr must be offsetInLib"
-
-        debugPath = self.libFinder.findDebugBin(binPath)
-        return self.resolve_real(debugPath, addr)
+        return self.resolve_real(binPath, addr)
 
     def _getNmTable (self, binPath):
         table = cache.get('nmsymbols', binPath, useDisk=False)
@@ -368,8 +366,11 @@ class SymbolResolver:
         for frame in self.addr2line(debugBin, sectionName, offsetInSection):
             (funcName, sourceFile, lineNo) = frame
             if funcName is None:
-                # try fall back to "nm" if addr2line can't resolve the function name
+                # try fall back to "nm" on actual binary if addr2line can't resolve the function name
                 (funcName, dummy, dummy) = self.nmResolver.resolve(actualBin, offsetInActualBin)
+            if funcName is None and debugBin != actualBin:
+                # try fall back to "nm" on debug binary (TODO: find and use offsetInDebugBin)
+                (funcName, dummy, dummy) = self.nmResolver.resolve(debugBin, offsetInActualBin)
             resultFrames.append( (funcName, sourceFile, lineNo) )
 
         return {'binPath': actualBin, 'offsetInBin': offsetInActualBin, 'frames': resultFrames}
