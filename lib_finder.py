@@ -41,7 +41,10 @@ class LibFinder:
         return (binascii.crc32(fd.read()) & 0xffffffff)
 
     def findDebugBin (self, binPath):
-        "Returns the path of an external debuginfo library (if available)"
+        """
+        Returns the path of an external debuginfo library, or None if no
+        matching debuginfo library could be found.
+        """
         if self.resultCache.has_key(binPath):
             return self.resultCache[binPath]
         else:
@@ -78,5 +81,5 @@ class LibFinder:
                 elif path.find('debug') >= 0:
                     print "debug file %s exists but CRC doesn't match (found 0x%08x, expected 0x%08x)" % (path, crc, debugCrc)
 
-        return binPath
+        return None
 

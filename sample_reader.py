@@ -360,15 +360,18 @@ class SymbolResolver:
             offsetInActualBin = newOffsetInActualBin
 
         # find separate debug bin (if available)
+        targetBin = actualBin
         debugBin = self.libFinder.findDebugBin(actualBin)
+        if debugBin is not None:
+            targetBin = debugBin
 
         resultFrames = []
-        for frame in self.addr2line(debugBin, sectionName, offsetInSection):
+        for frame in self.addr2line(targetBin, sectionName, offsetInSection):
             (funcName, sourceFile, lineNo) = frame
             if funcName is None:
                 # try fall back to "nm" on actual binary if addr2line can't resolve the function name
                 (funcName, dummy, dummy) = self.nmResolver.resolve(actualBin, offsetInActualBin)
-            if funcName is None and debugBin != actualBin:
+            if funcName is None and debugBin is not None:
                 # try fall back to "nm" on debug binary (TODO: find and use offsetInDebugBin)
                 (funcName, dummy, dummy) = self.nmResolver.resolve(debugBin, offsetInActualBin)
             resultFrames.append( (funcName, sourceFile, lineNo) )
