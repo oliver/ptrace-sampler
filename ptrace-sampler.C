@@ -100,7 +100,8 @@ void CreateSampleLibunwind (const int pid, unw_addr_space_t targetAddrSpace, voi
             }
             else if (stepResult < 0)
             {
-                printf("unw_step failed (%d)\n", stepResult);
+                printf("unw_step failed (%d / %s)\n", stepResult, unw_strerror(stepResult));
+                break;
             }
         }
 
