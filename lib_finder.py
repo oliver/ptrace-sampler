@@ -83,3 +83,13 @@ class LibFinder:
 
         return None
 
+if __name__ == '__main__':
+    import sys
+    libFinder = LibFinder()
+    origBinary = sys.argv[1]
+    debugBinary = libFinder.findDebugBin(origBinary)
+    if debugBinary is None:
+        print "no separate debug symbols found for '%s'" % origBinary
+    else:
+        print "debug symbols for '%s' are stored in '%s'" % (origBinary, debugBinary)
+
