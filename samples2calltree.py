@@ -53,9 +53,13 @@ def handleEvent (e):
         if binName is None: binName = '???'
         funcName = f[2]
         if f[1] == '[vdso]':
-            if currFrame == 1 and regs.has_key('oeax'):
-                # resolve syscall number which was stored in ORIG_EAX:
+            syscallId = None
+            if regs.has_key('eax') and regs['eax'] != 0:
+                syscallId = regs['eax']
+            elif regs.has_key('oeax'):
                 syscallId = regs['oeax']
+            if currFrame == 1 and syscallId is not None:
+                # resolve syscall number which was stored in EAX or ORIG_EAX:
                 if syscalls.SYSCALL_TABLE.has_key(syscallId):
                     funcName = 'SYS_%s' % syscalls.SYSCALL_TABLE[syscallId]
                 else:

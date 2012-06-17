@@ -119,10 +119,12 @@ void CreateSampleFramepointer (const int pid)
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
+    // Store eax and orig_eax (if we're in a syscall, this specifies the syscall number).
+    // Note: while we're in syscall epilog, syscall number has unfortunately already been lost.
     struct user_regs_struct regs;
     memset(&regs, 0x00, sizeof(regs));
     ptrace(PTRACE_GETREGS, pid, 0, &regs);
-    fprintf(outFile, "E: t=%d.%06d;p=%d;r_oeax=%lx\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.orig_eax);
+    fprintf(outFile, "E: t=%d.%06d;p=%d;r_eax=%lx;r_oeax=%lx\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.eax, regs.orig_eax);
 
     const unsigned int ip = regs.eip;
     unsigned int bp = regs.ebp;
