@@ -329,7 +329,7 @@ void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable)
             }
         }
 
-        if (!haveNewBp && useFpoHeuristic && (oldBp < stackStart || oldBp > stackEnd) && (lastGoodSp >= stackStart && lastGoodSp <= stackEnd))
+        if (useFpoHeuristic && (oldBp < stackStart || oldBp > stackEnd) && (lastGoodSp >= stackStart && lastGoodSp <= stackEnd))
         {
             DEBUG("EBP 0x%x is outside of stack", oldBp);
             fprintf(outFile, "*"); // add mark that this frame was missing frame pointer
@@ -345,6 +345,7 @@ void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable)
             */
 
             unsigned int currAddr = lastGoodSp;
+            bool success = false;
             while (currAddr < stackEnd)
             {
                 const unsigned int stackValue = ptrace(PTRACE_PEEKDATA, pid, currAddr, 0);
@@ -366,11 +367,16 @@ void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable)
                         DEBUG("heuristic found better EBP 0x%08x (0x%x bytes further down on stack)",
                             candidateBp, currAddr - lastGoodSp);
                         oldBp = candidateBp;
+                        success = true;
                         fprintf(outFile, "+"); // add mark that next is a successfully reconstructed frame
                         break;
                     }
                 }
                 currAddr++;
+            }
+            if (!success)
+            {
+                DEBUG("heuristic failed to find better EBP");
             }
             //printf("stack heuristic finished\n");
             fprintf(outFile, " ");
