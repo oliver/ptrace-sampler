@@ -407,7 +407,7 @@ void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable)
         oldBp = newBp;
         oldIp = newIp;
 
-	    if (newBp == 0x0 /*|| newBp == 0xFFFFFFFF*/)
+	    if (newBp == 0x0 || newBp == 0xFFFFFFFF)
 	    {
 	        break;
 	    }
