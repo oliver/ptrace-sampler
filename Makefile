@@ -32,6 +32,12 @@ ptrace-%: ptrace-%.C
 	g++ -W -Wall -Wextra \
 	-g3 -O0 \
 	-o $@ \
+	$+
+
+ptrace-sampler: ptrace-sampler.C
+	g++ -W -Wall -Wextra \
+	-g3 -O0 \
+	-o $@ \
 	$+ \
 	$(LIBUNWIND_OPTIONS)
 
