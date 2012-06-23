@@ -1,6 +1,8 @@
 
 
 LIBUNWIND_PREFIX:=/usr
+LIBBFD_PREFIX:=/usr
+
 BIN=app1 app2 app4 app11-sigchld ptrace-singlestep ptrace-sampler
 
 
@@ -13,6 +15,17 @@ else
 	-I$(LIBUNWIND_PREFIX)/include/ \
 	-L$(LIBUNWIND_PREFIX)/lib/ \
 	-lunwind-ptrace -lunwind-generic
+endif
+
+HAVE_LIBBFD:=$(shell ls $(LIBBFD_PREFIX)/lib/libbfd.a 2>/dev/null)
+ifeq ($(HAVE_LIBBFD),)
+    LIBBFD_OPTIONS:=
+else
+    LIBBFD_OPTIONS:= \
+	-DHAVE_LIBBFD=1 \
+	-I$(LIBBFD_PREFIX)/include/ \
+	-L$(LIBBFD_PREFIX)/lib/ \
+	-lbfd -lopcodes
 endif
 
 
@@ -34,11 +47,13 @@ ptrace-%: ptrace-%.C
 	-o $@ \
 	$+
 
-ptrace-sampler: ptrace-sampler.C
+ptrace-sampler: ptrace-sampler.C Disassembler.C DebugInterpreter.C DebugCreator.C
 	g++ -W -Wall -Wextra \
 	-g3 -O0 \
+	-I. \
 	-o $@ \
 	$+ \
+	$(LIBBFD_OPTIONS) \
 	$(LIBUNWIND_OPTIONS)
 
 release: ptrace-sampler

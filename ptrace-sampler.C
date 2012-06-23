@@ -8,8 +8,10 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <dirent.h>
+#include <string>
 #include <vector>
 #include <set>
+#include <map>
 #include <algorithm>
 
 #include <wait.h>
@@ -21,12 +23,26 @@
 #include <libunwind-ptrace.h>
 #endif
 
+
+#include <bfd.h>
+
+#include "Common.h"
+#include "Disassembler.h"
+#include "DebugInterpreter.h"
+#include "DebugCreator.h"
+
+
 // from https://bugzilla.redhat.com/attachment.cgi?id=263751&action=edit :
 #include <asm/unistd.h>
 #define tkill(tid, sig) syscall (__NR_tkill, (tid), (sig))
 
+using std::string;
+using std::vector;
+using std::set;
+using std::map;
+
 //
-// Sampling Functions
+// Global Options
 //
 
 FILE* outFile = stderr;
@@ -41,21 +57,25 @@ bool debugEnabled = false;
 int maxFrames = 40;
 
 
+struct Mapping
+{
+    unsigned int start;
+    unsigned int end;
+    string name;
+};
+
 unsigned int stackStart = 0;
 unsigned int stackEnd = 0;
 
-unsigned int vdsoStart = 0;
-unsigned int vdsoEnd = 0;
 
-
-static int64_t TimestampUsec ()
+int64_t TimestampUsec ()
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return int64_t(tv.tv_sec) * 1000000 + tv.tv_usec;
 }
 
-static char* TimestampString ()
+char* TimestampString ()
 {
 	static char timeStr[50];
 	struct timeval tv;
@@ -64,8 +84,85 @@ static char* TimestampString ()
 	return timeStr;
 }
 
-#define DEBUG(...) if (debugEnabled) { printf("[%s] ", TimestampString()); printf(__VA_ARGS__); printf("\n"); }
 
+
+struct SymbolAddressSort
+{
+    bool operator() (const asymbol* a, const asymbol* b)
+    {
+        return (a->value < b->value);
+    }
+};
+
+/// Create debug information for the specified functions in a binary
+void CreateDebugInfo (DI::DebugTable& debugTable, const string& binPath, const unsigned int mapAddress, const vector<string>& functions)
+{
+    bfd_init();
+    
+    bfd* abfd = bfd_openr(binPath.c_str(), NULL);
+    DEBUG("abfd for '%s': %p", binPath.c_str(), abfd);
+    if (!abfd)
+    {
+        return;
+    }
+
+    const int formatOk = bfd_check_format(abfd, bfd_object);
+    DEBUG("formatOk: %d", formatOk);
+    if (!formatOk)
+    {
+        return;
+    }
+
+    const int size = bfd_get_dynamic_symtab_upper_bound(abfd);
+    typedef std::vector<asymbol*> SymbolArray;
+    SymbolArray asymtab;
+    asymtab.resize(size / sizeof(asymbol*));
+    const int numSymbols = bfd_canonicalize_dynamic_symtab(abfd, &(asymtab[0]));
+    DEBUG("size: %d; numSymbols: %d", size, numSymbols);
+    asymtab.resize(numSymbols);
+    std::sort(asymtab.begin(), asymtab.end(), SymbolAddressSort());
+
+    for (unsigned int i = 0; i < asymtab.size(); ++i)
+    {
+        if (std::find(functions.begin(), functions.end(), asymtab[i]->name) != functions.end())
+        {
+            DEBUG("    sym #%d; name: %s; value: 0x%llx; flags: 0x%x; section name: %s",
+                i, asymtab[i]->name, asymtab[i]->value, asymtab[i]->flags, asymtab[i]->section->name);
+
+            unsigned long long nextAddress = 0;
+            bool foundNextAddress = false;
+            for (unsigned int j = i+1; j < asymtab.size(); j++)
+            {
+                nextAddress = asymtab[j]->value;
+                if (nextAddress != asymtab[i]->value)
+                {
+                    foundNextAddress = true;
+                    break;
+                }
+            }
+            if (!foundNextAddress)
+            {
+                nextAddress = asymtab[i]->section->size;
+            }
+
+            const unsigned long long symbolSize = nextAddress - asymtab[i]->value;
+            DEBUG("      nextAddress: 0x%08llx; symbol size: 0x%llx", nextAddress, symbolSize);
+
+            DebugCreator st(debugTable, abfd, asymtab[i]->section,
+                mapAddress,
+                asymtab[i]->value + asymtab[i]->section->vma,
+                asymtab[i]->value + asymtab[i]->section->vma + symbolSize);
+        }
+    }
+
+    bfd_close(abfd);
+    DEBUG("finished %s", binPath.c_str());
+}
+
+
+//
+// Sampling Functions
+//
 
 #ifdef HAVE_LIBUNWIND
 void CreateSampleLibunwind (const int pid, unw_addr_space_t targetAddrSpace, void* uptInfo)
@@ -114,7 +211,7 @@ void CreateSampleLibunwind (const int pid, unw_addr_space_t targetAddrSpace, voi
 #endif
 
 
-void CreateSampleFramepointer (const int pid)
+void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -127,7 +224,7 @@ void CreateSampleFramepointer (const int pid)
     fprintf(outFile, "E: t=%d.%06d;p=%d;r_eax=%lx;r_oeax=%lx\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.eax, regs.orig_eax);
 
     const unsigned int ip = regs.eip;
-    unsigned int bp = regs.ebp;
+    const unsigned int bp = regs.ebp;
     const unsigned int sp = regs.esp;
 
     fprintf(outFile, "%08x ", ip);
@@ -139,6 +236,7 @@ void CreateSampleFramepointer (const int pid)
     {
         const unsigned int instrBytes = ptrace(PTRACE_PEEKTEXT, pid, ip, 0);
         int retAddrAddr = 0; /// address (on stack) where return address is stored
+
         // prolog (as observed in the wild):
         //   55      push %ebp
         //   89 e5   mov %esp,%ebp
@@ -165,82 +263,75 @@ void CreateSampleFramepointer (const int pid)
             retAddrAddr = sp;
         }
 
-        else if (ip >= vdsoStart && ip <= vdsoEnd)
-        {
-            // Workaround for non-standard stack frame layout in __kernel_vsyscall (from VDSO)
-            //
-            // The __kernel_vsyscall function contains code to make a syscall.
-            // It is contained in the "vdso" section in memory, which is
-            // injected into the process memory by the kernel.
-            //
-            // I've found that the __kernel_vsyscall function usually looks like this:
-            //   51      push   %ecx
-            //   52      push   %edx
-            //   55      push   %ebp
-            //   89 e5   mov    %esp,%ebp
-            //   0f 34   sysenter
-            //   ...
-            //   5d   pop %ebp
-            //   5a   pop %edx
-            //   59   pop %ecx
-            //   c3   ret
-            //
-            // As EBP is not saved to stack right at the beginning, it doesn't
-            // contain an actual "base pointer", so the usual stack walking
-            // won't work here. Hence, this workaround is used to get the
-            // location of return address and to adjust the bp value used
-            // for further stack walking.
-
-            // TODO: add same workaround for other prolog instructions in __kernel_vsyscall
-            if ((instrBytes & 0xFFFF) == 0x340f)
-            {
-                // eip is at "sysenter".
-                // ebp and edx and ecx and return address should be on stack now.
-                retAddrAddr = sp + 12;
-                // use bp from stack:
-                bp = ptrace(PTRACE_PEEKDATA, pid, sp, 0);
-            }
-
-            else if (instrBytes == 0xc3595a5d)
-            {
-                // eip is at "pop %ebx".
-                // ebp and edx and ecx and return address should be on stack now.
-                retAddrAddr = sp + 12;
-                // use bp from stack:
-                bp = ptrace(PTRACE_PEEKDATA, pid, sp, 0);
-            }
-            else if ((instrBytes & 0xFFFFFF) == 0xc3595a)
-            {
-                // eip is at "pop %edx".
-                // edx and ecx and return address should be on stack now.
-                // bp should be popped from stack already.
-                retAddrAddr = sp + 8;
-            }
-            else if ((instrBytes & 0xFFFF) == 0xc359)
-            {
-                // eip is at "pop %ecx".
-                // ecx and return address should be on stack now.
-                // bp should be popped from stack already.
-                retAddrAddr = sp + 4;
-            }
-        }
-
         if (retAddrAddr != 0)
         {
             // simply insert an additional frame for the calling function
             const int retAddr = ptrace(PTRACE_PEEKDATA, pid, retAddrAddr, 0);
+            DEBUG("adding frame with EIP 0x%08x (from 0x%08x), EBP 0x%08x", retAddr, retAddrAddr, bp);
 	        fprintf(outFile, "%08x ", retAddr);
         }
     }
 
+    unsigned int oldSp = sp;
     unsigned int oldBp = bp;
+    unsigned int oldIp = ip;
     unsigned int lastGoodSp = sp;
-        
+
     for (int i = 1; i < maxFrames; i++)
     {
-        if (useFpoHeuristic && (oldBp < stackStart || oldBp > stackEnd) && (lastGoodSp >= stackStart && lastGoodSp <= stackEnd))
+        DEBUG("-------- FRAME %d --------", i);
+        unsigned int newSp = 0;
+        unsigned int newBp = 0;
+        bool haveNewBp = false;
+
+        unsigned int newIp = 0;
+        bool haveNewIp = false;
+
+        // try debug info first
         {
-            //printf("bp 0x%x is outside of stack\n", oldBp);
+            DI::Context context;
+            context.pid = pid;
+            context.esp = oldSp;
+            context.ebp = oldBp;
+            const bool foundEip = debugTable.GetRegValue(DI::REG_EIP, oldIp, context);
+            const unsigned int debugReturnEip = context.value;
+
+            if (foundEip)
+            {
+                newIp = debugReturnEip;
+                haveNewIp = true;
+                DEBUG("used debug info to get new EIP 0x%08x (from old EIP 0x%08x, ESP 0x%08x)",
+                    newIp, oldIp, oldSp);
+            }
+        }
+
+        {
+            DI::Context context;
+            context.pid = pid;
+            context.esp = oldSp;
+            context.ebp = oldBp;
+            const bool foundEsp = debugTable.GetRegValue(DI::REG_ESP, oldIp, context);
+            const unsigned int debugEsp = context.value;
+
+            context.pid = pid;
+            context.esp = oldSp;
+            context.ebp = oldBp;
+            const bool foundEbp = debugTable.GetRegValue(DI::REG_EBP, oldIp, context);
+            const unsigned int debugEbp = context.value;
+
+            if (foundEsp && foundEbp)
+            {
+                newSp = debugEsp;
+                newBp = debugEbp;
+                haveNewBp = true;
+                DEBUG("used debug info to get new EBP 0x%08x, ESP 0x%08x (from old EIP 0x%08x, ESP 0x%08x)",
+                    newBp, newSp, oldIp, oldSp);
+            }
+        }
+
+        if (!haveNewBp && useFpoHeuristic && (oldBp < stackStart || oldBp > stackEnd) && (lastGoodSp >= stackStart && lastGoodSp <= stackEnd))
+        {
+            DEBUG("EBP 0x%x is outside of stack", oldBp);
             fprintf(outFile, "*"); // add mark that this frame was missing frame pointer
 
             /*
@@ -272,7 +363,8 @@ void CreateSampleFramepointer (const int pid)
                         && candidateSubBp > candidateBp
                         && candidateIp != 0x0 && candidateIp != 0xffffffff)
                     {
-                        //printf("candidate appears good\n");
+                        DEBUG("heuristic found better EBP 0x%08x (0x%x bytes further down on stack)",
+                            candidateBp, currAddr - lastGoodSp);
                         oldBp = candidateBp;
                         fprintf(outFile, "+"); // add mark that next is a successfully reconstructed frame
                         break;
@@ -286,11 +378,29 @@ void CreateSampleFramepointer (const int pid)
 
         lastGoodSp = oldBp;
 
-	    const unsigned int newBp = ptrace(PTRACE_PEEKDATA, pid, oldBp, 0);
-	    const unsigned int newIp = ptrace(PTRACE_PEEKDATA, pid, oldBp+4, 0);
+        if (!haveNewIp)
+        {
+            // fall back to normal frame pointer walking
+            newIp = ptrace(PTRACE_PEEKDATA, pid, oldBp+4, 0);
+            DEBUG("using frame pointer to get new EIP 0x%08x (from old EIP 0x%08x, EBP 0x%08x)",
+                newIp, oldIp, oldBp);
+        }
+
+        if (!haveNewBp)
+        {
+            // fall back to normal frame pointer walking
+            newBp = ptrace(PTRACE_PEEKDATA, pid, oldBp, 0);
+            newSp = newBp+4;
+            DEBUG("using frame pointer to get new EBP 0x%08x (from old EIP 0x%08x, EBP 0x%08x)",
+                newBp, oldIp, oldBp);
+        }
 
 	    fprintf(outFile, "%08x ", newIp);
-	    oldBp = newBp;
+
+        oldSp = newSp;
+        oldBp = newBp;
+        oldIp = newIp;
+
 	    if (newBp == 0x0 /*|| newBp == 0xFFFFFFFF*/)
 	    {
 	        break;
@@ -298,7 +408,6 @@ void CreateSampleFramepointer (const int pid)
     }
     fprintf(outFile, "\n");
 }
-
 
 
 //
@@ -513,11 +622,17 @@ int main (int argc, char* argv[])
 #endif
 
     // save mappings of child (required for address->line conversion later)
+    
+    vector<Mapping> mappings;
+    
     char mapFileName[200];
     sprintf(mapFileName, "/proc/%d/maps", pid);
     FILE* mapFd = fopen(mapFileName, "r");
     while (true)
     {
+        // example line:
+        // 08048000-08063000 r-xp 00000000 09:00 1968565    /usr/bin/less
+
         char line[500];
         memset(line, '\0', sizeof(line));
         fgets(line, 500, mapFd);
@@ -533,10 +648,15 @@ int main (int argc, char* argv[])
             stackStart = strtoll(line, NULL, 16);
             stackEnd = strtoll(line+9, NULL, 16);
         }
-        if (strncmp(line+49, "[vdso]", 6) == 0)
+
+        if (line[20] == 'x') // only look for executable segments
         {
-            vdsoStart = strtoll(line, NULL, 16);
-            vdsoEnd = strtoll(line+9, NULL, 16);
+            Mapping m;
+            m.start = strtoll(line, NULL, 16);
+            m.end = strtoll(line+9, NULL, 16);
+            m.name = string(line+49);
+            m.name = m.name.substr(0, m.name.length()-1);
+            mappings.push_back(m);
         }
     }
 
@@ -545,7 +665,28 @@ int main (int argc, char* argv[])
         printf("stack start: 0x%x; end: 0x%x; size: %d\n", int(stackStart), int(stackEnd), int(stackEnd - stackStart));
     }
 
-    printf("vdso start: 0x%x; end: 0x%x; size: %d\n", vdsoStart, vdsoEnd, int(vdsoEnd - vdsoStart));
+
+    DI::DebugTable debugTable;
+
+    vector<string> vdsoFunctions;
+    vdsoFunctions.push_back("__kernel_vsyscall");
+    vector<string> libcFunctions;
+    libcFunctions.push_back("__gettimeofday");
+    libcFunctions.push_back("memset");
+    libcFunctions.push_back("memcpy");
+    libcFunctions.push_back("__getpid");
+
+    for (unsigned int i = 0; i < mappings.size(); i++)
+    {
+        if (mappings[i].name.find("[vdso]") != string::npos)
+        {
+            CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start, vdsoFunctions);
+        }
+        if (mappings[i].name.find("/libc-") != string::npos)
+        {
+            CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start, libcFunctions);
+        }
+    }
 
 
     DEBUG("starting loop");
@@ -626,7 +767,7 @@ int main (int argc, char* argv[])
                     else
 #endif
                     {
-                        CreateSampleFramepointer(allTasks[i].pid);
+                        CreateSampleFramepointer(allTasks[i].pid, debugTable);
                     }
                 }
             }
