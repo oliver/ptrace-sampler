@@ -2,34 +2,18 @@
 #define DEBUG_CREATOR_H_
 
 
-#include "Disassembler.h"
 #include "DebugInterpreter.h"
 
+#include <string>
+#include <vector>
 
-class DebugCreator : public Disassembler
-{
-public:
-    DebugCreator (DI::DebugTable& debugTable,
-                  bfd* abfd,
-                  asection* section,
-                  const unsigned int segmentMapAddress,
-                  const unsigned int startAddress,
-                  const unsigned int endAddress);
+using std::string;
+using std::vector;
 
-    virtual void HandleInstruction (const unsigned int addr,
-                                    const unsigned int /*length*/,
-                                    const InsType insType,
-                                    const vector<string>& args);
 
-private:
-    DI::DebugTable& debugTableRef;
-    const unsigned int segmentMapAddress;
-    asection* section;
-
-    int stackSize;
-    bool ebpPushed;
-    int ebpStackOffset;
-};
-
+void CreateDebugInfo (DI::DebugTable& debugTable,
+                      const string& binPath,
+                      const unsigned int mapAddress,
+                      const vector<string>& functions);
 
 #endif

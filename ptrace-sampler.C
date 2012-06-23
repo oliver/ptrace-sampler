@@ -12,7 +12,6 @@
 #include <vector>
 #include <set>
 #include <map>
-#include <algorithm>
 
 #include <wait.h>
 #include <sys/ptrace.h>
@@ -23,11 +22,7 @@
 #include <libunwind-ptrace.h>
 #endif
 
-
-#include <bfd.h>
-
 #include "Common.h"
-#include "Disassembler.h"
 #include "DebugInterpreter.h"
 #include "DebugCreator.h"
 
@@ -82,81 +77,6 @@ char* TimestampString ()
 	gettimeofday(&tv, NULL);
 	sprintf(timeStr, "%d.%06d", int(tv.tv_sec), int(tv.tv_usec));
 	return timeStr;
-}
-
-
-
-struct SymbolAddressSort
-{
-    bool operator() (const asymbol* a, const asymbol* b)
-    {
-        return (a->value < b->value);
-    }
-};
-
-/// Create debug information for the specified functions in a binary
-void CreateDebugInfo (DI::DebugTable& debugTable, const string& binPath, const unsigned int mapAddress, const vector<string>& functions)
-{
-    bfd_init();
-    
-    bfd* abfd = bfd_openr(binPath.c_str(), NULL);
-    DEBUG("abfd for '%s': %p", binPath.c_str(), abfd);
-    if (!abfd)
-    {
-        return;
-    }
-
-    const int formatOk = bfd_check_format(abfd, bfd_object);
-    DEBUG("formatOk: %d", formatOk);
-    if (!formatOk)
-    {
-        return;
-    }
-
-    const int size = bfd_get_dynamic_symtab_upper_bound(abfd);
-    typedef std::vector<asymbol*> SymbolArray;
-    SymbolArray asymtab;
-    asymtab.resize(size / sizeof(asymbol*));
-    const int numSymbols = bfd_canonicalize_dynamic_symtab(abfd, &(asymtab[0]));
-    DEBUG("size: %d; numSymbols: %d", size, numSymbols);
-    asymtab.resize(numSymbols);
-    std::sort(asymtab.begin(), asymtab.end(), SymbolAddressSort());
-
-    for (unsigned int i = 0; i < asymtab.size(); ++i)
-    {
-        if (std::find(functions.begin(), functions.end(), asymtab[i]->name) != functions.end())
-        {
-            DEBUG("    sym #%d; name: %s; value: 0x%llx; flags: 0x%x; section name: %s",
-                i, asymtab[i]->name, asymtab[i]->value, asymtab[i]->flags, asymtab[i]->section->name);
-
-            unsigned long long nextAddress = 0;
-            bool foundNextAddress = false;
-            for (unsigned int j = i+1; j < asymtab.size(); j++)
-            {
-                nextAddress = asymtab[j]->value;
-                if (nextAddress != asymtab[i]->value)
-                {
-                    foundNextAddress = true;
-                    break;
-                }
-            }
-            if (!foundNextAddress)
-            {
-                nextAddress = asymtab[i]->section->size;
-            }
-
-            const unsigned long long symbolSize = nextAddress - asymtab[i]->value;
-            DEBUG("      nextAddress: 0x%08llx; symbol size: 0x%llx", nextAddress, symbolSize);
-
-            DebugCreator st(debugTable, abfd, asymtab[i]->section,
-                mapAddress,
-                asymtab[i]->value + asymtab[i]->section->vma,
-                asymtab[i]->value + asymtab[i]->section->vma + symbolSize);
-        }
-    }
-
-    bfd_close(abfd);
-    DEBUG("finished %s", binPath.c_str());
 }
 
 
@@ -287,6 +207,7 @@ void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable)
         unsigned int newIp = 0;
         bool haveNewIp = false;
 
+#ifdef HAVE_LIBBFD
         // try debug info first
         {
             DI::Context context;
@@ -328,6 +249,7 @@ void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable)
                     newBp, newSp, oldIp, oldSp);
             }
         }
+#endif
 
         if (useFpoHeuristic && (oldBp < stackStart || oldBp > stackEnd) && (lastGoodSp >= stackStart && lastGoodSp <= stackEnd))
         {
@@ -674,6 +596,7 @@ int main (int argc, char* argv[])
 
     DI::DebugTable debugTable;
 
+#ifdef HAVE_LIBBFD
     vector<string> vdsoFunctions;
     vdsoFunctions.push_back("__kernel_vsyscall");
     vector<string> libcFunctions;
@@ -693,6 +616,7 @@ int main (int argc, char* argv[])
             CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start, libcFunctions);
         }
     }
+#endif
 
 
     DEBUG("starting loop");
