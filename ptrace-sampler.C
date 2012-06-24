@@ -565,8 +565,8 @@ int main (int argc, char* argv[])
 
         char line[500];
         memset(line, '\0', sizeof(line));
-        fgets(line, 500, mapFd);
-        if (feof(mapFd))
+        const char* result = fgets(line, 500, mapFd);
+        if (result == NULL || feof(mapFd))
         {
             break;
         }
