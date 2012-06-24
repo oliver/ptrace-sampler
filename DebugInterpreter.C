@@ -15,6 +15,9 @@ namespace DI
 {
 
 
+BaseFunc::~BaseFunc ()
+{ }
+
 FuncValue::FuncValue (const unsigned int value_)
 : value(value_)
 { }
@@ -69,6 +72,23 @@ void FuncReadStackValue::Execute (Context& c) const
     c.value = ptrace(PTRACE_PEEKDATA, c.pid, c.esp + this->offset, 0);
 }
 
+
+DebugTable::~DebugTable ()
+{
+    for (PcMap::iterator itPc = this->debugInfo.begin();
+         itPc != this->debugInfo.end(); ++itPc)
+    {
+        for (RegisterMap::iterator itReg = itPc->second.begin();
+             itReg != itPc->second.end(); ++itReg)
+        {
+            for (ExecChain::iterator itExec = itReg->second.begin();
+                 itExec != itReg->second.end(); ++itExec)
+            {
+                delete *itExec;
+            }
+        }
+    }
+}
 
 bool DebugTable::GetRegValue (const RegisterName reg, const unsigned int pc, Context& c) const
 {

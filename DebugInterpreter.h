@@ -36,6 +36,7 @@ public:
 class BaseFunc
 {
 public:
+    virtual ~BaseFunc ();
     virtual void Execute (Context& c) const = 0;
 };
 
@@ -94,6 +95,8 @@ typedef vector<BaseFunc*> ExecChain;
 class DebugTable
 {
 public:
+    ~DebugTable ();
+
     /// @brief Use debug info to get register value
     bool GetRegValue (const RegisterName reg, const unsigned int pc, Context& c) const;
     void AddDebugInfo (const RegisterName reg, const unsigned int pc, const ExecChain& ec);
