@@ -8,6 +8,7 @@
 
 
 void Disassembler::Disassemble (bfd* abfd, asection* section,
+    char* sectionContents,
     const unsigned int startAddress, const unsigned int endAddress)
 {
     disassembler_ftype disasFunc = disassembler(abfd);
@@ -24,7 +25,7 @@ void Disassembler::Disassemble (bfd* abfd, asection* section,
     disasInfo.buffer_vma = section->vma;
     disasInfo.buffer_length = section->size;
     disasInfo.section = section;
-    bfd_malloc_and_get_section(abfd, section, &disasInfo.buffer);
+    disasInfo.buffer = (bfd_byte*) sectionContents;
     disassemble_init_for_target(&disasInfo);
 
     DEBUG("disassembling addr range: 0x%x - 0x%x", startAddress, endAddress);
@@ -53,8 +54,6 @@ void Disassembler::Disassemble (bfd* abfd, asection* section,
 
         pc += count;
     }
-
-    free(disasInfo.buffer);
 }
 
 

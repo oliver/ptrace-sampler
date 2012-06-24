@@ -22,6 +22,7 @@ public:
 
     void Disassemble (bfd* abfd,
                       asection* section,
+                      char* sectionContents,
                       const unsigned int startAddress,
                       const unsigned int endAddress);
 

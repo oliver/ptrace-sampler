@@ -13,6 +13,7 @@ public:
                   bfd* abfd,
                   asection* section,
                   const unsigned int segmentMapAddress,
+                  char* sectionContents,
                   const unsigned int startAddress,
                   const unsigned int endAddress);
 
@@ -36,6 +37,7 @@ DebugCreator::DebugCreator (DI::DebugTable& debugTable_,
                             bfd* abfd_,
                             asection* section_,
                             const unsigned int segmentMapAddress_,
+                            char* sectionContents_,
                             const unsigned int startAddress,
                             const unsigned int endAddress)
 : debugTableRef(debugTable_),
@@ -45,7 +47,7 @@ stackSize(0),
 ebpPushed(false),
 ebpStackOffset(0)
 {
-    this->Disassemble(abfd_, section_, startAddress, endAddress);
+    this->Disassemble(abfd_, section_, sectionContents_, startAddress, endAddress);
 }
 
 void DebugCreator::HandleInstruction (const unsigned int addr,
@@ -126,8 +128,9 @@ struct SymbolAddressSort
     }
 };
 
-/// Create debug information for the specified functions in a binary
-void CreateDebugInfo (DI::DebugTable& debugTable, const string& binPath, const unsigned int mapAddress, const vector<string>& functions)
+void CreateDebugInfo (DI::DebugTable& debugTable,
+                      const string& binPath,
+                      const unsigned int mapAddress)
 {
     bfd_init();
 
@@ -154,9 +157,30 @@ void CreateDebugInfo (DI::DebugTable& debugTable, const string& binPath, const u
     asymtab.resize(numSymbols);
     std::sort(asymtab.begin(), asymtab.end(), SymbolAddressSort());
 
+    asection* textSection = bfd_get_section_by_name(abfd, ".text");
+    bfd_byte* textSectionContents;
+    bfd_malloc_and_get_section(abfd, textSection, &textSectionContents);
+
     for (unsigned int i = 0; i < asymtab.size(); ++i)
     {
-        if (std::find(functions.begin(), functions.end(), asymtab[i]->name) != functions.end())
+        asection* section = asymtab[i]->section;
+        if (string(section->name) != ".text")
+        {
+            continue;
+        }
+
+        // peek at first bytes in function:
+        const bfd_byte* startAddress = textSectionContents + asymtab[i]->value;
+        const unsigned int* firstBytes = (unsigned int*)(startAddress);
+
+        // A "good" function prolog (which saves the frame pointer and also can
+        // be detected by ptrace-sampler at runtime) looks like this:
+        //   55      push %ebp
+        //   89 e5   mov %esp,%ebp
+        static const unsigned int goodPrologBytes = 0xe58955;
+
+        const bool haveGoodProlog = (((*firstBytes) & 0xFFFFFF) == goodPrologBytes);
+        if (!haveGoodProlog)
         {
             DEBUG("    sym #%d; name: %s; value: 0x%llx; flags: 0x%x; section name: %s",
                 i, asymtab[i]->name, asymtab[i]->value, asymtab[i]->flags, asymtab[i]->section->name);
@@ -182,10 +206,13 @@ void CreateDebugInfo (DI::DebugTable& debugTable, const string& binPath, const u
 
             DebugCreator st(debugTable, abfd, asymtab[i]->section,
                 mapAddress,
+                (char*)textSectionContents,
                 asymtab[i]->value + asymtab[i]->section->vma,
                 asymtab[i]->value + asymtab[i]->section->vma + symbolSize);
         }
     }
+
+    free(textSectionContents);
 
     bfd_close(abfd);
     DEBUG("finished %s", binPath.c_str());

@@ -601,28 +601,30 @@ int main (int argc, char* argv[])
     DI::DebugTable debugTable;
 
 #ifdef HAVE_LIBBFD
-    vector<string> vdsoFunctions;
-    vdsoFunctions.push_back("__kernel_vsyscall");
-    vector<string> libcFunctions;
-    libcFunctions.push_back("__gettimeofday");
-    libcFunctions.push_back("memset");
-    libcFunctions.push_back("memcpy");
-    libcFunctions.push_back("__getpid");
+    vector<string> debugLibPatterns;
+    debugLibPatterns.push_back("[vdso]");
+    debugLibPatterns.push_back("/libc");
 
     for (unsigned int i = 0; i < mappings.size(); i++)
     {
-        if (mappings[i].name.find("[vdso]") != string::npos)
+        for (vector<string>::const_iterator it = debugLibPatterns.begin();
+             it != debugLibPatterns.end(); ++it)
         {
-            const VdsoBinary tempBinary;
-            CreateDebugInfo(debugTable, tempBinary.Path(), mappings[i].start, vdsoFunctions);
-        }
-        if (mappings[i].name.find("/libc-") != string::npos)
-        {
-            CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start, libcFunctions);
+            if (mappings[i].name.find(*it) != string::npos)
+            {
+                if (*it == "[vdso]")
+                {
+                    const VdsoBinary tempBinary;
+                    CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start);
+                }
+                else
+                {
+                    CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start);
+                }
+            }
         }
     }
 #endif
-
 
     DEBUG("starting loop");
     int64_t numSamples = 0;
