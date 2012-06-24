@@ -509,6 +509,7 @@ int main (int argc, char* argv[])
 #endif
             allTasks.push_back(ti);
         }
+        closedir(taskDir);
     }
 
     // attach
@@ -588,6 +589,8 @@ int main (int argc, char* argv[])
             mappings.push_back(m);
         }
     }
+    fclose(mapFd);
+    mapFd = NULL;
 
     if (useFpoHeuristic && !useLibunwind)
     {
