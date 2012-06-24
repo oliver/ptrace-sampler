@@ -20,6 +20,7 @@ enum RegisterName
     REG_ESP,
     REG_EBP,
 };
+static const int NUM_REGISTERS = 3;
 
 
 class Context
@@ -90,7 +91,35 @@ private:
 
 
 
-typedef vector<BaseFunc*> ExecChain;
+class ExecChain
+{
+public:
+    ExecChain ()
+    : numFuncs(0)
+    { }
+
+    inline void push_back(BaseFunc* func)
+    {
+        this->funcs[this->numFuncs] = func;
+        this->numFuncs++;
+    }
+
+    inline BaseFunc* at (const unsigned short index) const
+    {
+        return this->funcs[index];
+    }
+
+    inline unsigned short size () const
+    {
+        return this->numFuncs;
+    }
+
+private:
+    // statically allow up to four functions for this exec chain
+    BaseFunc* funcs[4];
+    unsigned short numFuncs;
+};
+
 
 class DebugTable
 {
@@ -102,8 +131,13 @@ public:
     void AddDebugInfo (const RegisterName reg, const unsigned int pc, const ExecChain& ec);
 
 private:
-    typedef map<RegisterName, ExecChain> RegisterMap;
-    typedef map<unsigned int, RegisterMap> PcMap;
+    struct PcFuncs
+    {
+        // function chains for each register
+        ExecChain registerFuncs[NUM_REGISTERS];
+    };
+
+    typedef map<unsigned int, PcFuncs> PcMap;
     PcMap debugInfo;
 };
 

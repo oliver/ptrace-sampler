@@ -73,18 +73,17 @@ void FuncReadStackValue::Execute (Context& c) const
 }
 
 
+
 DebugTable::~DebugTable ()
 {
     for (PcMap::iterator itPc = this->debugInfo.begin();
          itPc != this->debugInfo.end(); ++itPc)
     {
-        for (RegisterMap::iterator itReg = itPc->second.begin();
-             itReg != itPc->second.end(); ++itReg)
+        for (int i = 0; i < NUM_REGISTERS; ++i)
         {
-            for (ExecChain::iterator itExec = itReg->second.begin();
-                 itExec != itReg->second.end(); ++itExec)
+            for (unsigned int j = 0; j < itPc->second.registerFuncs[i].size(); ++j)
             {
-                delete *itExec;
+                delete itPc->second.registerFuncs[i].at(j);
             }
         }
     }
@@ -100,24 +99,16 @@ bool DebugTable::GetRegValue (const RegisterName reg, const unsigned int pc, Con
     }
     else
     {
-        const RegisterMap::const_iterator itReg = itPc->second.find(reg);
-        if (itReg == itPc->second.end())
+        const ExecChain& funcs = itPc->second.registerFuncs[reg];
+
+        DEBUG("executing %d funcs to get value of register %d", funcs.size(), reg);
+        for (unsigned int i = 0; i < funcs.size(); ++i)
         {
-            // no debug info for this register
-            return false;
+            const BaseFunc* func = funcs.at(i);
+            func->Execute(c);
         }
-        else
-        {
-            DEBUG("executing %d funcs to get value of register %d", itReg->second.size(), reg);
-            for (ExecChain::const_iterator itChain = itReg->second.begin();
-                 itChain != itReg->second.end(); ++itChain)
-            {
-                const BaseFunc* func = *itChain;
-                func->Execute(c);
-            }
-            DEBUG("found value 0x%x for register %d", c.value, reg);
-            return true;
-        }
+        DEBUG("found value 0x%x for register %d", c.value, reg);
+        return true;
     }
 }
 
@@ -125,7 +116,7 @@ void DebugTable::AddDebugInfo (const RegisterName reg, const unsigned int pc, co
 {
     DEBUG("DebugTable: adding debug info for register %d, pc 0x%08x: %d BaseFuncs",
         reg, pc, ec.size());
-    debugInfo[pc][reg] = ec;
+    debugInfo[pc].registerFuncs[reg] = ec;
 }
 
 
