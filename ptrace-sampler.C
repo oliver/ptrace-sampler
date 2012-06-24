@@ -475,10 +475,6 @@ int main (int argc, char* argv[])
     }
 #endif
 
-    signal(SIGINT, SignalHandler);
-    signal(SIGTERM, SignalHandler);
-    signal(SIGCHLD, SigchldHandler);
-
     fprintf(outFile, "# trace file from %s\n", argv[0]);
     fprintf(outFile, "# for PID %d\n", pid);
     fprintf(outFile, "# samples taken every %d usec\n", sampleInterval);
@@ -638,6 +634,10 @@ int main (int argc, char* argv[])
         }
     }
 #endif
+
+    signal(SIGINT, SignalHandler);
+    signal(SIGTERM, SignalHandler);
+    signal(SIGCHLD, SigchldHandler);
 
     DEBUG("starting loop");
     int64_t numSamples = 0;
