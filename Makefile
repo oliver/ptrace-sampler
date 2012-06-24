@@ -52,7 +52,7 @@ ptrace-%: ptrace-%.C
 
 ptrace-sampler: $(PTRACE_SAMPLER_CXX_SRCS)
 	g++ -W -Wall -Wextra \
-	-g3 -O0 \
+	-g3 -O2 \
 	-I. \
 	-o $@ \
 	$+ \
