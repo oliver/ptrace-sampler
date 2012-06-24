@@ -5,7 +5,7 @@ LIBBFD_PREFIX:=/usr
 
 BIN=app1 app2 app4 app11-sigchld ptrace-singlestep ptrace-sampler
 
-PTRACE_SAMPLER_CXX_SRCS:=ptrace-sampler.C DebugInterpreter.C
+PTRACE_SAMPLER_CXX_SRCS:=ptrace-sampler.C DebugInterpreter.C Vdso.C
 
 HAVE_LIBUNWIND:=$(shell ls $(LIBUNWIND_PREFIX)/lib/libunwind-ptrace.a 2>/dev/null)
 ifeq ($(HAVE_LIBUNWIND),)

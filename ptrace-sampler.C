@@ -25,6 +25,7 @@
 #include "Common.h"
 #include "DebugInterpreter.h"
 #include "DebugCreator.h"
+#include "Vdso.h"
 
 
 // from https://bugzilla.redhat.com/attachment.cgi?id=263751&action=edit :
@@ -609,7 +610,8 @@ int main (int argc, char* argv[])
     {
         if (mappings[i].name.find("[vdso]") != string::npos)
         {
-            CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start, vdsoFunctions);
+            const VdsoBinary tempBinary;
+            CreateDebugInfo(debugTable, tempBinary.Path(), mappings[i].start, vdsoFunctions);
         }
         if (mappings[i].name.find("/libc-") != string::npos)
         {
