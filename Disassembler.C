@@ -2,6 +2,7 @@
 #include "Common.h"
 #include "Disassembler.h"
 
+#include <malloc.h>
 #include <dis-asm.h>
 #include <cstdarg>
 
@@ -52,6 +53,8 @@ void Disassembler::Disassemble (bfd* abfd, asection* section,
 
         pc += count;
     }
+
+    free(disasInfo.buffer);
 }
 
 
