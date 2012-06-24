@@ -379,7 +379,7 @@ static void Usage (const char* argv0)
     [--max-frames | -f <max. number of frames to trace back>]\n\
     [--fpo | --no-fpo]\n\
     [--unwind | -u | --framepointer | -fp]\n\
-    [--debug | -d | --no-debug]\n", argv0);
+    [--verbose | -v | --no-verbose]\n", argv0);
 }
 
 int main (int argc, char* argv[])
@@ -427,11 +427,11 @@ int main (int argc, char* argv[])
         {
             useLibunwind = false;
         }
-        else if (strcmp(argv[i], "--debug") == 0 || strcmp(argv[i], "-d") == 0)
+        else if (strcmp(argv[i], "--verbose") == 0 || strcmp(argv[i], "-v") == 0)
         {
             debugEnabled = true;
         }
-        else if (strcmp(argv[i], "--no-debug") == 0)
+        else if (strcmp(argv[i], "--no-verbose") == 0)
         {
             debugEnabled = false;
         }
