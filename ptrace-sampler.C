@@ -377,6 +377,7 @@ static void Usage (const char* argv0)
     [--interval | -i <msec>]\n\
     [--max-samples | -s <max. number of samples to collect>]\n\
     [--max-frames | -f <max. number of frames to trace back>]\n\
+    [--debug | -d | --no-debug | -nd]\n\
     [--fpo | --no-fpo]\n\
     [--unwind | -u | --framepointer | -fp]\n\
     [--verbose | -v | --no-verbose]\n", argv0);
@@ -388,6 +389,7 @@ int main (int argc, char* argv[])
     int sampleInterval = 5 * 1000; // usec
     int maxSamples = 0;
     bool useLibunwind = false;
+    bool useDebugInfo = true;
 
     for (int i = 1; i < argc; i++)
     {
@@ -410,6 +412,14 @@ int main (int argc, char* argv[])
         {
             maxFrames = atoi(argv[i+1]);
             i++;
+        }
+        else if (strcmp(argv[i], "--debug") == 0 || strcmp(argv[i], "-d") == 0)
+        {
+            useDebugInfo = true;
+        }
+        else if (strcmp(argv[i], "--no-debug") == 0 || strcmp(argv[i], "-nd") == 0)
+        {
+            useDebugInfo = false;
         }
         else if (strcmp(argv[i], "--fpo") == 0)
         {
@@ -601,25 +611,28 @@ int main (int argc, char* argv[])
     DI::DebugTable debugTable;
 
 #ifdef HAVE_LIBBFD
-    vector<string> debugLibPatterns;
-    debugLibPatterns.push_back("[vdso]");
-    debugLibPatterns.push_back("/libc");
-
-    for (unsigned int i = 0; i < mappings.size(); i++)
+    if (useDebugInfo)
     {
-        for (vector<string>::const_iterator it = debugLibPatterns.begin();
-             it != debugLibPatterns.end(); ++it)
+        vector<string> debugLibPatterns;
+        debugLibPatterns.push_back("[vdso]");
+        debugLibPatterns.push_back("/libc");
+
+        for (unsigned int i = 0; i < mappings.size(); i++)
         {
-            if (mappings[i].name.find(*it) != string::npos)
+            for (vector<string>::const_iterator it = debugLibPatterns.begin();
+                 it != debugLibPatterns.end(); ++it)
             {
-                if (*it == "[vdso]")
+                if (mappings[i].name.find(*it) != string::npos)
                 {
-                    const VdsoBinary tempBinary;
-                    CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start);
-                }
-                else
-                {
-                    CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start);
+                    if (*it == "[vdso]")
+                    {
+                        const VdsoBinary tempBinary;
+                        CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start);
+                    }
+                    else
+                    {
+                        CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start);
+                    }
                 }
             }
         }
