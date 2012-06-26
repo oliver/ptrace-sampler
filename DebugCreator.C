@@ -164,6 +164,12 @@ void CreateDebugInfo (DI::DebugTable& debugTable,
 
     for (unsigned int i = 0; i < asymtab.size(); ++i)
     {
+        if (i > 0 && asymtab[i-1]->value == asymtab[i]->value)
+        {
+            // skip over symbols location which were handled already 
+            continue;
+        }
+
         asection* section = asymtab[i]->section;
         if (string(section->name) != ".text")
         {

@@ -5,9 +5,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include <sys/ptrace.h>
-#include <sys/user.h>
-#include <sys/reg.h>
 
 
 // Debug Interpreter
@@ -116,6 +115,7 @@ void DebugTable::AddDebugInfo (const RegisterName reg, const unsigned int pc, co
 {
     DEBUG("DebugTable: adding debug info for register %d, pc 0x%08x: %d BaseFuncs",
         reg, pc, ec.size());
+    assert(debugInfo[pc].registerFuncs[reg].size() == 0);
     debugInfo[pc].registerFuncs[reg] = ec;
 }
 
