@@ -26,7 +26,7 @@ public:
                       const unsigned int startAddress,
                       const unsigned int endAddress);
 
-    virtual void HandleInstruction (const unsigned int addr,
+    virtual bool HandleInstruction (const unsigned int addr,
                                     const unsigned int length,
                                     const InsType ins,
                                     const vector<char*>& args) = 0;

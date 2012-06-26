@@ -18,7 +18,7 @@ public:
                   const unsigned int startAddress,
                   const unsigned int endAddress);
 
-    virtual void HandleInstruction (const unsigned int addr,
+    virtual bool HandleInstruction (const unsigned int addr,
                                     const unsigned int /*length*/,
                                     const InsType insType,
                                     const vector<char*>& args);
@@ -51,7 +51,7 @@ ebpStackOffset(0)
     this->Disassemble(abfd_, section_, sectionContents_, startAddress, endAddress);
 }
 
-void DebugCreator::HandleInstruction (const unsigned int addr,
+bool DebugCreator::HandleInstruction (const unsigned int addr,
                                       const unsigned int /*length*/,
                                       const InsType insType,
                                       const vector<char*>& args)
@@ -61,6 +61,31 @@ void DebugCreator::HandleInstruction (const unsigned int addr,
     const unsigned int sectionRelativePc = addr - this->section->vma;
     const unsigned int segmentRelativeIp = sectionRelativePc + vdsoTextSectionOffset;
     const unsigned int processLocalPc = segmentMapAddress + segmentRelativeIp;
+
+    /// debug instructions for getting EBP:
+    {
+        DI::ExecChain ec;
+        if (ebpPushed)
+        {
+            if (this->ebpStackOffset == 4)
+            {
+                // ebp has been saved as first element on stack;
+                // hence we can use normal frame pointer walking for this function,
+                // and won't need additional debug info:
+                DEBUG("stopping debug info generation because function effectively has good prolog");
+                return false;
+            }
+            // get EBP from stack:
+            ec.push_back( new DI::FuncReadStackValue(this->stackSize - this->ebpStackOffset) );
+        }
+        else
+        {
+            // EBP has not been saved so far; as EBP must be restored by each function,
+            // it must still be valid:
+            ec.push_back( new DI::FuncReadReg(DI::REG_EBP) );
+        }
+        this->debugTableRef.AddDebugInfo(DI::REG_EBP, processLocalPc, ec);
+    }
 
     /// debug instructions for getting EIP:
     {
@@ -75,23 +100,6 @@ void DebugCreator::HandleInstruction (const unsigned int addr,
         ec.push_back( new DI::FuncReadReg(DI::REG_ESP) );
         ec.push_back( new DI::FuncAdd( this->stackSize+4 ) );
         this->debugTableRef.AddDebugInfo(DI::REG_ESP, processLocalPc, ec);
-    }
-
-    /// debug instructions for getting EBP:
-    {
-        DI::ExecChain ec;
-        if (ebpPushed)
-        {
-            // get EBP from stack:
-            ec.push_back( new DI::FuncReadStackValue(this->stackSize - this->ebpStackOffset) );
-        }
-        else
-        {
-            // EBP has not been saved so far; as EBP must be restored by each function,
-            // it must still be valid:
-            ec.push_back( new DI::FuncReadReg(DI::REG_EBP) );
-        }
-        this->debugTableRef.AddDebugInfo(DI::REG_EBP, processLocalPc, ec);
     }
 
     switch (insType)
@@ -118,6 +126,7 @@ void DebugCreator::HandleInstruction (const unsigned int addr,
             this->stackSize -= 4;
             break;
     }
+    return true;
 }
 
 

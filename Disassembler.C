@@ -60,7 +60,10 @@ void Disassembler::Disassemble (bfd* abfd, asection* section,
             DEBUG("      args[%d]: '%s'", j, args[j]);
         }
 
-        this->HandleInstruction(pc, count, insType, args);
+        if (!this->HandleInstruction(pc, count, insType, args))
+        {
+            break;
+        }
 
         pc += count;
     }
