@@ -3,6 +3,7 @@
 #include "Common.h"
 #include "Disassembler.h"
 
+#include <string.h>
 #include <algorithm>
 
 
@@ -20,7 +21,7 @@ public:
     virtual void HandleInstruction (const unsigned int addr,
                                     const unsigned int /*length*/,
                                     const InsType insType,
-                                    const vector<string>& args);
+                                    const vector<char*>& args);
 
 private:
     DI::DebugTable& debugTableRef;
@@ -53,7 +54,7 @@ ebpStackOffset(0)
 void DebugCreator::HandleInstruction (const unsigned int addr,
                                       const unsigned int /*length*/,
                                       const InsType insType,
-                                      const vector<string>& args)
+                                      const vector<char*>& args)
 {
     const unsigned int vdsoTextSectionOffset = this->section->filepos;
 
@@ -101,7 +102,7 @@ void DebugCreator::HandleInstruction (const unsigned int addr,
             // TODO
             break;
         case INS_PUSH:
-            if (args[0] == "%ebp")
+            if (strcmp(args[0], "%ebp") == 0)
             {
                 this->ebpPushed = true;
                 this->ebpStackOffset = this->stackSize+4;
@@ -109,7 +110,7 @@ void DebugCreator::HandleInstruction (const unsigned int addr,
             this->stackSize += 4;
             break;
         case INS_POP:
-            if (args[0] == "%ebp")
+            if (strcmp(args[0], "%ebp") == 0)
             {
                 this->ebpPushed = false;
                 ebpStackOffset = -1;

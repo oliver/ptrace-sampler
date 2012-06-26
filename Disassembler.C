@@ -6,6 +6,15 @@
 #include <dis-asm.h>
 #include <cstdarg>
 
+#include <string.h>
+#include <assert.h>
+
+
+static void DisasPrintAddress(bfd_vma, struct disassemble_info*)
+{
+    // do nothing
+}
+
 
 void Disassembler::Disassemble (bfd* abfd, asection* section,
     char* sectionContents,
@@ -18,8 +27,9 @@ void Disassembler::Disassemble (bfd* abfd, asection* section,
         section->name, section->size, section->vma, section->lma, section->output_offset, section->filepos);
 
     struct disassemble_info disasInfo;
-    string printBuffer;
+    char printBuffer[100];
     init_disassemble_info(&disasInfo, &printBuffer, (fprintf_ftype)DisasPrintf);
+    disasInfo.print_address_func = DisasPrintAddress;
     disasInfo.arch = bfd_get_arch(abfd);
     disasInfo.mach = bfd_get_mach(abfd);
     disasInfo.buffer_vma = section->vma;
@@ -33,21 +43,21 @@ void Disassembler::Disassemble (bfd* abfd, asection* section,
 
     for (unsigned int pc = startAddress; pc < endAddress; /* empty */)
     {
-        printBuffer.clear();
+        printBuffer[0] = '\0';
         const int count = disasFunc(pc, &disasInfo);
-        DEBUG("  pc: %x; count: %d; disas: '%s'", pc, count, printBuffer.c_str());
+        DEBUG("  pc: %x; count: %d; disas: '%s'", pc, count, printBuffer);
         if (count <= 0)
         {
             break;
         }
 
-        std::vector<std::string> args;
+        vector<char*> args;
         const InsType insType = DecodeInsString(printBuffer, args);
         DEBUG("    pc: 0x%08x; raw: '%s'; instype: %d; %d args:",
-            pc, printBuffer.c_str(), insType, args.size());
+            pc, printBuffer, insType, args.size());
         for (unsigned int j = 0; j < args.size(); ++j)
         {
-            DEBUG("      args[%d]: '%s'", j, args[j].c_str());
+            DEBUG("      args[%d]: '%s'", j, args[j]);
         }
 
         this->HandleInstruction(pc, count, insType, args);
@@ -57,42 +67,46 @@ void Disassembler::Disassemble (bfd* abfd, asection* section,
 }
 
 
-Disassembler::InsType Disassembler::DecodeInsString (const string& s, vector<string>& args)
+Disassembler::InsType Disassembler::DecodeInsString (char* s, vector<char*>& args)
 {
-    args.clear();
-    string::size_type pos = s.find(' ');
-    if (pos == std::string::npos)
+    char* pos = strchr(s, ' ');
+    if (pos == NULL)
     {
         return INS_UNKNOWN;
     }
-    const string insStr = s.substr(0, pos);
+    *pos = '\0';
+    
+    pos++;
+    while (*pos == ' ')
+    {
+        pos++;
+    }
 
-    pos = s.find_first_not_of(' ', pos+1);
-    if (pos != string::npos)
+    if (*pos != '\0')
     {
         while (1)
         {
-            const string::size_type commaPos = s.find(',', pos);
-            if (commaPos == string::npos)
+            args.push_back(pos);
+            pos = strchr(pos, ',');
+            if (pos == NULL)
             {
                 break;
             }
-            args.push_back( s.substr(pos, commaPos - pos) );
-            pos = commaPos+1;
+            *pos = '\0';
+            pos++;
         }
-        args.push_back( s.substr(pos) );
     }
 
     InsType typ = INS_UNKNOWN;
-    if (insStr == "mov" && args.size() == 2)
+    if (strcmp(s, "mov") == 0 && args.size() == 2)
     {
         typ = INS_MOV;
     }
-    else if (insStr == "push" && args.size() == 1)
+    else if (strcmp(s, "push") == 0 && args.size() == 1)
     {
         typ = INS_PUSH;
     }
-    else if (insStr == "pop" && args.size() == 1)
+    else if (strcmp(s, "pop") == 0 && args.size() == 1)
     {
         typ = INS_POP;
     }
@@ -102,13 +116,19 @@ Disassembler::InsType Disassembler::DecodeInsString (const string& s, vector<str
 
 void Disassembler::DisasPrintf (void* userData, const char* format, ...)
 {
-    string* outString = (string*)userData;
-
-    va_list args;
-    va_start(args, format);
-    char buffer[100];
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-
-    outString->append(buffer);
+    char* outBuffer = (char*)userData;
+    
+    if (strchr(format, '%') == NULL)
+    {
+        strcat(outBuffer, format);
+    }
+    else
+    {
+        assert( strcmp(format, "%s") == 0 );
+        va_list args;
+        va_start(args, format);
+        const char* stringArg = va_arg(args, char*);
+        strcat(outBuffer, stringArg);
+        va_end(args);
+    }
 }

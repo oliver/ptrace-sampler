@@ -29,10 +29,10 @@ public:
     virtual void HandleInstruction (const unsigned int addr,
                                     const unsigned int length,
                                     const InsType ins,
-                                    const vector<string>& args) = 0;
+                                    const vector<char*>& args) = 0;
 
 private:
-    static InsType DecodeInsString (const string& s, vector<string>& args);
+    static InsType DecodeInsString (char* s, vector<char*>& args);
     static void DisasPrintf (void* userData, const char* format, ...);
 };
 
