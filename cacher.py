@@ -46,18 +46,21 @@ class Cacher:
                 continue
 
             filePath = os.path.join(self.basePath, f)
-            (ftyp, fpath, fcrc) = f[:-6].split('_')
-            ftyp = urllib.unquote(ftyp)
-            fpath = urllib.unquote(fpath)
-            fcrc = int(fcrc, 16)
-            fstat = os.stat(filePath)
-            ftimestamp = max(fstat.st_ctime, fstat.st_mtime)
+            try:
+                (ftyp, fpath, fcrc) = f[:-6].split('_')
+                ftyp = urllib.unquote(ftyp)
+                fpath = urllib.unquote(fpath)
+                fcrc = int(fcrc, 16)
+                fstat = os.stat(filePath)
+                ftimestamp = max(fstat.st_ctime, fstat.st_mtime)
 
-            if ftyp == typ and fpath == path and fcrc == realCrc and ftimestamp >= realTimestamp:
-                fd = open(filePath, 'rb')
-                data = pickle.load(fd)
-                self.memCache[memKey] = data
-                return data
+                if ftyp == typ and fpath == path and fcrc == realCrc and ftimestamp >= realTimestamp:
+                    fd = open(filePath, 'rb')
+                    data = pickle.load(fd)
+                    self.memCache[memKey] = data
+                    return data
+            except:
+                continue
         return None
 
     def store (self, typ, path, data, useDisk=True):
@@ -97,6 +100,7 @@ class Cacher:
             if not(
                 (c >= 'a' and c <= 'z') or
                 (c >= 'A' and c <= 'Z') or
+                #(c in ('.', '-')) or
                 (c >= '0' and c <= '9')):
                 res += '%%%02x' % ord(c)
             else:
