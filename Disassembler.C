@@ -24,7 +24,9 @@ void Disassembler::Disassemble (bfd* abfd, asection* section,
     DEBUG("disasFunc: %p", disasFunc);
 
     DEBUG("section name: %s; size: %lld; vma: 0x%llx; lma: 0x%llx; output_offset: 0x%lld; filepos: %llx",
-        section->name, section->size, section->vma, section->lma, section->output_offset, section->filepos);
+        section->name, (long long int)section->size, (long long int)section->vma,
+        (long long int)section->lma, (long long int)section->output_offset,
+        (long long int)section->filepos);
 
     struct disassemble_info disasInfo;
     char printBuffer[100];

@@ -199,7 +199,7 @@ void CreateDebugInfo (DI::DebugTable& debugTable,
         if (!haveGoodProlog)
         {
             DEBUG("    sym #%d; name: %s; value: 0x%llx; flags: 0x%x; section name: %s",
-                i, asymtab[i]->name, asymtab[i]->value, asymtab[i]->flags, asymtab[i]->section->name);
+                i, asymtab[i]->name, (long long int)asymtab[i]->value, asymtab[i]->flags, asymtab[i]->section->name);
 
             unsigned long long nextAddress = 0;
             bool foundNextAddress = false;
