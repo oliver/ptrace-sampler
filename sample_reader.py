@@ -10,6 +10,7 @@ import time
 import subprocess
 import select
 import re
+import resource
 
 from lib_finder import LibFinder
 from cacher import Cacher
@@ -178,7 +179,10 @@ class SymbolResolver:
         self.a2lProcs = {} # holds a list of running addr2line processes (indexed by (binPath,section))
 
         self.textSectionOffsetCache = {}
-        
+
+        # don't create core files if a subprocess crashes
+        resource.setrlimit(resource.RLIMIT_CORE, (0, -1))
+
         self.libFinder = LibFinder()
         self.disassembler = Disassembler()
         self.nmResolver = NmResolver(self.libFinder)
