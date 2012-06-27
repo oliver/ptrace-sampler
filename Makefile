@@ -26,7 +26,7 @@ else
 	-DHAVE_LIBBFD=1 \
 	-I$(LIBBFD_PREFIX)/include/ \
 	-L$(LIBBFD_PREFIX)/lib/ \
-	-lbfd -lopcodes
+	-lbfd -lopcodes -liberty
 
     PTRACE_SAMPLER_CXX_SRCS+=Disassembler.C DebugCreator.C
 endif
