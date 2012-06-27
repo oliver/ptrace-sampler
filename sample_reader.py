@@ -183,6 +183,14 @@ class SymbolResolver:
         self.disassembler = Disassembler()
         self.nmResolver = NmResolver(self.libFinder)
 
+    def __del__ (self):
+        # make sure we don't leave any addr2line processes running:
+        for proc in self.a2lProcs.values():
+            proc.poll()
+            if proc.returncode is None:
+                # process is still running
+                os.kill(proc.pid, 9)
+
     def _getSections (self, binPath):
         sections = cache.get('sections', binPath, useDisk=False)
         if sections is not None:
