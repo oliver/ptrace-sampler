@@ -623,7 +623,7 @@ int main (int argc, char* argv[])
                     if (*it == "[vdso]")
                     {
                         const VdsoBinary tempBinary;
-                        CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start);
+                        CreateDebugInfo(debugTable, tempBinary.Path(), mappings[i].start);
                     }
                     else
                     {
