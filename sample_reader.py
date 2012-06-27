@@ -178,8 +178,6 @@ class SymbolResolver:
 
         self.a2lProcs = {} # holds a list of running addr2line processes (indexed by (binPath,section))
 
-        self.textSectionOffsetCache = {}
-
         # don't create core files if a subprocess crashes
         resource.setrlimit(resource.RLIMIT_CORE, (0, -1))
 
@@ -236,26 +234,6 @@ class SymbolResolver:
                 break
             lastSection = (name, address, offset)
         return lastSection
-
-    def getTextSectionOffset (self, binPath):
-        if self.textSectionOffsetCache.has_key(binPath):
-            return self.textSectionOffsetCache[binPath]
-        else:
-            res = self._getTextSectionOffset_real(binPath)
-            self.textSectionOffsetCache[binPath] = res
-            return res
-
-    def _getTextSectionOffset_real (self, binPath):
-        readelfProc = subprocess.Popen(["readelf", "-S", binPath], stdout=subprocess.PIPE)
-        for line in readelfProc.stdout:
-            #m = re.match(r'\s*\[\d+\]\s+\.text\s*')
-            line = line.lstrip(' [')
-            parts = line.split()
-            if len(parts) > 5 and parts[1] == '.text' and parts[2] == 'PROGBITS':
-                addr = int(parts[3], 16)
-                offset = int(parts[4], 16)
-                return (addr, offset)
-        return (None, None)
 
     def addr2line (self, binPath, section, addr):
         processKey = (binPath, section)
