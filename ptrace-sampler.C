@@ -23,6 +23,7 @@
 #endif
 
 #include "Common.h"
+#include "MemoryMappings.h"
 #include "DebugInterpreter.h"
 #include "DebugCreator.h"
 #include "Vdso.h"
@@ -52,13 +53,6 @@ bool debugEnabled = false;
 /// max. number of stack frames to trace back
 int maxFrames = 40;
 
-
-struct Mapping
-{
-    unsigned int start;
-    unsigned int end;
-    string name;
-};
 
 unsigned int stackStart = 0;
 unsigned int stackEnd = 0;
@@ -557,46 +551,21 @@ int main (int argc, char* argv[])
  	}
 #endif
 
-    // save mappings of child (required for address->line conversion later)
-    
-    vector<Mapping> mappings;
-    
-    char mapFileName[200];
-    sprintf(mapFileName, "/proc/%d/maps", pid);
-    FILE* mapFd = fopen(mapFileName, "r");
-    while (true)
+    const MemoryMappings mappings(pid);
+
+    const MemoryMappings::Mapping* stackMemory = mappings.Find("[stack]");
+    if (stackMemory)
     {
-        // example line:
-        // 08048000-08063000 r-xp 00000000 09:00 1968565    /usr/bin/less
-
-        char line[500];
-        memset(line, '\0', sizeof(line));
-        const char* result = fgets(line, 500, mapFd);
-        if (result == NULL || feof(mapFd))
-        {
-            break;
-        }
-
-        fprintf(outFile, "M: %s", line);
-
-        if (strncmp(line+49, "[stack]", 7) == 0)
-        {
-            stackStart = strtoll(line, NULL, 16);
-            stackEnd = strtoll(line+9, NULL, 16);
-        }
-
-        if (line[20] == 'x') // only look for executable segments
-        {
-            Mapping m;
-            m.start = strtoll(line, NULL, 16);
-            m.end = strtoll(line+9, NULL, 16);
-            m.name = string(line+49);
-            m.name = m.name.substr(0, m.name.length()-1);
-            mappings.push_back(m);
-        }
+        stackStart = stackMemory->start;
+        stackEnd = stackMemory->end;
     }
-    fclose(mapFd);
-    mapFd = NULL;
+
+    // save mappings of child (required for address->line conversion later)
+    const vector<string> mapLines = MemoryMappings::RawLines(pid);
+    for (unsigned int i = 0; i < mapLines.size(); ++i)
+    {
+        fprintf(outFile, "M: %s", mapLines[i].c_str());
+    }
 
     if (useFpoHeuristic && !useLibunwind)
     {
@@ -613,21 +582,22 @@ int main (int argc, char* argv[])
         debugLibPatterns.push_back("[vdso]");
         debugLibPatterns.push_back("/libc");
 
-        for (unsigned int i = 0; i < mappings.size(); i++)
+        for (MemoryMappings::const_iterator itMap = mappings.Begin();
+             itMap != mappings.End(); ++itMap)
         {
             for (vector<string>::const_iterator it = debugLibPatterns.begin();
                  it != debugLibPatterns.end(); ++it)
             {
-                if (mappings[i].name.find(*it) != string::npos)
+                if (itMap->isExecutable && itMap->name.find(*it) != string::npos)
                 {
                     if (*it == "[vdso]")
                     {
                         const VdsoBinary tempBinary;
-                        CreateDebugInfo(debugTable, tempBinary.Path(), mappings[i].start);
+                        CreateDebugInfo(debugTable, tempBinary.Path(), itMap->start);
                     }
                     else
                     {
-                        CreateDebugInfo(debugTable, mappings[i].name, mappings[i].start);
+                        CreateDebugInfo(debugTable, itMap->name, itMap->start);
                     }
                 }
             }
