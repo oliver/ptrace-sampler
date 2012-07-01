@@ -27,6 +27,7 @@
 #include "DebugInterpreter.h"
 #include "DebugCreator.h"
 #include "Vdso.h"
+#include "PltList.h"
 
 
 // from https://bugzilla.redhat.com/attachment.cgi?id=263751&action=edit :
@@ -126,7 +127,7 @@ void CreateSampleLibunwind (const int pid, unw_addr_space_t targetAddrSpace, voi
 #endif
 
 
-void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable)
+void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable, const PltList& pltList)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -144,10 +145,19 @@ void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable)
 
     fprintf(outFile, "%08x ", ip);
 
+    if (pltList.FindContainingPlt(ip))
+    {
+        // PLT entries don't save ebp; so calling address is at esp.
+        // Simply insert an additional frame for the calling function.
+        const int retAddr = ptrace(PTRACE_PEEKDATA, pid, sp, 0);
+        DEBUG("adding frame with EIP 0x%08x (from 0x%08x) due to PLT", retAddr, sp);
+        fprintf(outFile, "%08x ", retAddr);
+    }
     // Check if eip is in function prolog (ie. when ebp is not updated yet),
     // and use esp in that case to get eip of calling frame.
     // Similarly, detect if eip is in function epilog (ie. when ebp is already
     // updated for return to caller), and again fall back to esp in that case.
+    else
     {
         const unsigned int instrBytes = ptrace(PTRACE_PEEKTEXT, pid, ip, 0);
         int retAddrAddr = 0; /// address (on stack) where return address is stored
@@ -574,6 +584,7 @@ int main (int argc, char* argv[])
 
 
     DI::DebugTable debugTable;
+    PltList pltList;
 
 #ifdef HAVE_LIBBFD
     if (useDebugInfo)
@@ -585,6 +596,8 @@ int main (int argc, char* argv[])
         for (MemoryMappings::const_iterator itMap = mappings.Begin();
              itMap != mappings.End(); ++itMap)
         {
+            pltList.AddPlt(*itMap);
+
             for (vector<string>::const_iterator it = debugLibPatterns.begin();
                  it != debugLibPatterns.end(); ++it)
             {
@@ -688,7 +701,7 @@ int main (int argc, char* argv[])
                     else
 #endif
                     {
-                        CreateSampleFramepointer(allTasks[i].pid, debugTable);
+                        CreateSampleFramepointer(allTasks[i].pid, debugTable, pltList);
                     }
                 }
             }
