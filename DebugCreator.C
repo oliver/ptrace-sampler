@@ -56,11 +56,11 @@ bool DebugCreator::HandleInstruction (const unsigned int addr,
                                       const InsType insType,
                                       const vector<char*>& args)
 {
-    const unsigned int vdsoTextSectionOffset = this->section->filepos;
+    const unsigned int textSectionOffset = this->section->filepos;
 
-    const unsigned int sectionRelativePc = addr - this->section->vma;
-    const unsigned int segmentRelativeIp = sectionRelativePc + vdsoTextSectionOffset;
-    const unsigned int processLocalPc = segmentMapAddress + segmentRelativeIp;
+    const unsigned int sectionRelativeIp = addr - this->section->vma;
+    const unsigned int segmentRelativeIp = sectionRelativeIp + textSectionOffset;
+    const unsigned int processLocalIp = segmentMapAddress + segmentRelativeIp;
 
     /// debug instructions for getting EBP:
     {
@@ -84,14 +84,14 @@ bool DebugCreator::HandleInstruction (const unsigned int addr,
             // it must still be valid:
             ec.push_back( new DI::FuncReadReg(DI::REG_EBP) );
         }
-        this->debugTableRef.AddDebugInfo(DI::REG_EBP, processLocalPc, ec);
+        this->debugTableRef.AddDebugInfo(DI::REG_EBP, processLocalIp, ec);
     }
 
     /// debug instructions for getting EIP:
     {
         DI::ExecChain ec;
         ec.push_back( new DI::FuncReadStackValue(this->stackSize) );
-        this->debugTableRef.AddDebugInfo(DI::REG_EIP, processLocalPc, ec);
+        this->debugTableRef.AddDebugInfo(DI::REG_EIP, processLocalIp, ec);
     }
 
     /// debug instructions for getting ESP (as it was at function entry):
@@ -99,7 +99,7 @@ bool DebugCreator::HandleInstruction (const unsigned int addr,
         DI::ExecChain ec;
         ec.push_back( new DI::FuncReadReg(DI::REG_ESP) );
         ec.push_back( new DI::FuncAdd( this->stackSize+4 ) );
-        this->debugTableRef.AddDebugInfo(DI::REG_ESP, processLocalPc, ec);
+        this->debugTableRef.AddDebugInfo(DI::REG_ESP, processLocalIp, ec);
     }
 
     switch (insType)
