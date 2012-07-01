@@ -1,7 +1,6 @@
 
 #include "Common.h"
 #include "DebugInterpreter.h"
-#include "Disassembler.h"
 
 #include <stdlib.h>
 #include <string.h>
