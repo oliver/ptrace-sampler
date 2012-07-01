@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <stdio.h>
 
 extern bool debugEnabled;
 
