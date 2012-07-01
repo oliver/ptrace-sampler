@@ -3,7 +3,7 @@
 LIBUNWIND_PREFIX:=/usr
 LIBBFD_PREFIX:=/usr
 
-BIN=app1 app2 app4 app11-sigchld ptrace-singlestep ptrace-sampler
+BIN=app1 app2 app4 app7-libc app11-sigchld ptrace-sampler ptrace-singlestep
 
 PTRACE_SAMPLER_CXX_SRCS:=ptrace-sampler.C DebugInterpreter.C Vdso.C
 
