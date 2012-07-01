@@ -642,6 +642,7 @@ int main (int argc, char* argv[])
     DEBUG("starting loop");
     int64_t numSamples = 0;
     int64_t lastSample = 0;
+    int64_t totalSamplingDuration = 0;
     while (true)
     {
         if (terminate)
@@ -721,7 +722,9 @@ int main (int argc, char* argv[])
                     }
                 }
             }
-            DEBUG("sampling %d thread(s) took %lld usec", allTasks.size(), TimestampUsec() - sampleStartTime);
+            const int64_t sampleEndTime = TimestampUsec();
+            totalSamplingDuration += sampleEndTime - sampleStartTime;
+            DEBUG("sampling %d thread(s) took %lld usec", allTasks.size(), sampleEndTime - sampleStartTime);
         }
         else
         {
@@ -805,6 +808,7 @@ int main (int argc, char* argv[])
     }
 
     printf("exiting after taking %lld samples\n", numSamples);
+    printf("sample creation took %lld usec on average\n", totalSamplingDuration / numSamples);
 
 #ifdef HAVE_LIBUNWIND
     if (useLibunwind)
