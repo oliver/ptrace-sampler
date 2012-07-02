@@ -25,12 +25,14 @@ bool PltList::AddPlt (const MemoryMappings::Mapping& mapping)
     const int formatOk = bfd_check_format(abfd, bfd_object);
     if (!formatOk)
     {
+        bfd_close(abfd);
         return false;
     }
 
     const asection* pltSectionPtr = bfd_get_section_by_name(abfd, ".plt");
     if (!pltSectionPtr)
     {
+        bfd_close(abfd);
         return false;
     }
 
