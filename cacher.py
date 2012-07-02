@@ -87,7 +87,16 @@ class Cacher:
         assert(os.path.isfile(path))
         crc = self._calcCrc(path)
         fileName = '%s_%s_%08x.cache' % (self._urlquote(typ), self._urlquote(path), crc)
-        return os.path.join(self.basePath, fileName)
+        fullPath = os.path.join(self.basePath, fileName)
+
+        MAX_PATH_LENGTH = 250 # arbitrary limit - I think this should cover all systems
+        if len(fullPath) > MAX_PATH_LENGTH:
+            overflow = len(fullPath) - MAX_PATH_LENGTH
+            fileName = '%s_%s_%08x.cache' % (self._urlquote(typ), self._urlquote(path)[overflow:], crc)
+            fullPath = os.path.join(self.basePath, fileName)
+
+        assert( len(fullPath) <= MAX_PATH_LENGTH )
+        return fullPath
 
     def _calcCrc (self, path):
         fd = open(path, 'rb')
@@ -100,7 +109,6 @@ class Cacher:
             if not(
                 (c >= 'a' and c <= 'z') or
                 (c >= 'A' and c <= 'Z') or
-                #(c in ('.', '-')) or
                 (c >= '0' and c <= '9')):
                 res += '%%%02x' % ord(c)
             else:
