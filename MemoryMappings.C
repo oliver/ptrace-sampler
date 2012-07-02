@@ -16,8 +16,11 @@ MemoryMappings::MemoryMappings (const int pid)
         Mapping m;
         m.start = strtoll(line, NULL, 16);
         m.end = strtoll(line+9, NULL, 16);
-        m.name = string(line+49);
-        m.name = m.name.substr(0, m.name.length()-1);
+        if (lines[i].length() > 49)
+        {
+            m.name = string(line+49);
+            m.name = m.name.substr(0, m.name.length()-1);
+        }
         m.isExecutable = (line[20] == 'x');
         this->mappings.push_back(m);
     }
