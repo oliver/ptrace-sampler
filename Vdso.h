@@ -21,8 +21,6 @@ public:
 private:
     FILE* outFile;
     string path;
-
-    static void GetVdsoAddress (unsigned int& start, unsigned int& end);
 };
 
 #endif

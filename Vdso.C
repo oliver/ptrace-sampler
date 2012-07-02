@@ -1,6 +1,7 @@
 
 #include "Vdso.h"
 #include "Common.h"
+#include "MemoryMappings.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -16,9 +17,14 @@ using std::vector;
 VdsoBinary::VdsoBinary ()
 : outFile(NULL)
 {
-    unsigned int startAddress = 0;
-    unsigned int endAddress = 0;
-    GetVdsoAddress(startAddress, endAddress);
+    const MemoryMappings allMappings(getpid());
+    const MemoryMappings::Mapping* vdsoMemory = allMappings.Find("[vdso]");
+    if (!vdsoMemory)
+    {
+        return;
+    }
+    const unsigned int startAddress = vdsoMemory->start;
+    const unsigned int endAddress = vdsoMemory->end;
 
     const int size = endAddress - startAddress;
     if (size <= 0 || size > 100000)
@@ -100,32 +106,3 @@ string VdsoBinary::Path () const
 {
     return this->path;
 }
-
-
-void VdsoBinary::GetVdsoAddress (unsigned int& start, unsigned int& end)
-{
-    char mapFileName[] = "/proc/self/maps";
-    FILE* mapFd = fopen(mapFileName, "r");
-    while (true)
-    {
-        // example line:
-        // 08048000-08063000 r-xp 00000000 09:00 1968565    /usr/bin/less
-
-        char line[500];
-        memset(line, '\0', sizeof(line));
-        const char* result = fgets(line, 500, mapFd);
-        if (result == NULL || feof(mapFd))
-        {
-            break;
-        }
-
-        if (strncmp(line+49, "[vdso]", 6) == 0)
-        {
-            start = strtoll(line, NULL, 16);
-            end = strtoll(line+9, NULL, 16);
-            break;
-        }
-    }
-    fclose(mapFd);
-}
-
