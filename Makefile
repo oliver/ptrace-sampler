@@ -3,10 +3,11 @@
 LIBUNWIND_PREFIX:=/usr
 LIBBFD_PREFIX:=/usr
 
-BIN=app1 app2 app4 app7-libc app11-sigchld ptrace-sampler ptrace-singlestep
+BIN=app1 app2 app4 app7-libc app11-sigchld ptrace-sampler ptrace-singlestep extract-vdso
 
 PTRACE_SAMPLER_CXX_SRCS:= \
     ptrace-sampler.C \
+    Common.C \
     MemoryMappings.C \
     DebugInterpreter.C \
     Vdso.C \
@@ -63,6 +64,12 @@ ptrace-sampler: $(PTRACE_SAMPLER_CXX_SRCS)
 	$+ \
 	$(LIBBFD_OPTIONS) \
 	$(LIBUNWIND_OPTIONS)
+
+extract-vdso: extract-vdso.C Common.C MemoryMappings.C Vdso.C
+	g++ -W -Wall -Wextra \
+	-g3 -O0 \
+	-o $@ \
+	$+
 
 release: ptrace-sampler
 	tar cvzf ../ptrace-sampler-release-`date '+%Y%m%d-%H%M%S'`.tgz \
