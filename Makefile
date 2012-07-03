@@ -3,7 +3,8 @@
 LIBUNWIND_PREFIX:=/usr
 LIBBFD_PREFIX:=/usr
 
-BIN=app1 app2 app4 app7-libc app11-sigchld ptrace-sampler ptrace-singlestep extract-vdso linux-gate.dso.1
+MAIN_BINS=ptrace-sampler ptrace-singlestep extract-vdso linux-gate.dso.1
+TEST_BINS=app1 app2 app4 app7-libc app11-sigchld
 
 PTRACE_SAMPLER_CXX_SRCS:= \
     ptrace-sampler.C \
@@ -37,11 +38,11 @@ else
     PTRACE_SAMPLER_CXX_SRCS+=Disassembler.C DebugCreator.C
 endif
 
-
-all: $(BIN)
-
+main: $(MAIN_BINS)
+tests: $(TEST_BINS)
+all: $(MAIN_BINS) $(TEST_BINS)
 clean:
-	rm -f $(BIN)
+	rm -f $(MAIN_BINS) $(TEST_BINS)
 
 app%: app%.C
 	g++ -W -Wall -Wextra \
