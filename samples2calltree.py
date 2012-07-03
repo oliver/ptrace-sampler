@@ -51,6 +51,7 @@ def handleEvent (e):
     for f in e[1]:
         binName = f[1]
         if binName is None: binName = '???'
+        if binName == '[vdso]': binName = 'linux-gate.dso.1'
         funcName = f[2]
         if f[1] == '[vdso]' and currFrame == 1:
             syscallId = None

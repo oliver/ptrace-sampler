@@ -3,7 +3,7 @@
 LIBUNWIND_PREFIX:=/usr
 LIBBFD_PREFIX:=/usr
 
-BIN=app1 app2 app4 app7-libc app11-sigchld ptrace-sampler ptrace-singlestep extract-vdso
+BIN=app1 app2 app4 app7-libc app11-sigchld ptrace-sampler ptrace-singlestep extract-vdso linux-gate.dso.1
 
 PTRACE_SAMPLER_CXX_SRCS:= \
     ptrace-sampler.C \
@@ -70,6 +70,10 @@ extract-vdso: extract-vdso.C Common.C MemoryMappings.C Vdso.C
 	-g3 -O0 \
 	-o $@ \
 	$+
+
+# extract VDSO (kernel-provided shared library) as file, for display in kcachegrind:
+linux-gate.dso.1: extract-vdso
+	./extract-vdso linux-gate.dso.1
 
 release: ptrace-sampler
 	tar cvzf ../ptrace-sampler-release-`date '+%Y%m%d-%H%M%S'`.tgz \
