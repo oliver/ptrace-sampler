@@ -4,7 +4,7 @@ LIBUNWIND_PREFIX:=/usr
 LIBBFD_PREFIX:=/usr
 
 MAIN_BINS=ptrace-sampler ptrace-singlestep extract-vdso linux-gate.dso.1
-TEST_BINS=app1 app2 app4 app7-libc app11-sigchld
+TEST_BINS=app1 app2 app4 app7-libc app9-gl app11-sigchld
 
 PTRACE_SAMPLER_CXX_SRCS:= \
     ptrace-sampler.C \
@@ -43,6 +43,14 @@ tests: $(TEST_BINS)
 all: $(MAIN_BINS) $(TEST_BINS)
 clean:
 	rm -f $(MAIN_BINS) $(TEST_BINS)
+
+app%-gl: app%-gl.C
+	g++ -W -Wall -Wextra \
+	-g3 -O0 -rdynamic \
+	-pthread \
+	-lglut \
+	-o $@ \
+	$+
 
 app%: app%.C
 	g++ -W -Wall -Wextra \
