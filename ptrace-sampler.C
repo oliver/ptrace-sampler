@@ -349,10 +349,9 @@ static void SignalHandler (int /*sig*/)
     terminate = true;
 }
 
-static void SigchldHandler (int sig)
+static void SigchldHandler (int /*sig*/)
 {
     // ignore signal
-    DEBUG("ignoring SIGCHLD (%d)", sig);
 }
 
 
