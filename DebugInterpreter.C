@@ -110,6 +110,11 @@ bool DebugTable::GetRegValue (const RegisterName reg, const unsigned int pc, Con
     }
 }
 
+bool DebugTable::HaveInfo (const unsigned int pc) const
+{
+    return (this->debugInfo.find(pc) != this->debugInfo.end());
+}
+
 void DebugTable::AddDebugInfo (const RegisterName reg, const unsigned int pc, const ExecChain& ec)
 {
     DEBUG("DebugTable: adding debug info for register %d, pc 0x%08x: %d BaseFuncs",

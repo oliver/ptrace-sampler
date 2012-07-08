@@ -135,12 +135,13 @@ void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable, 
         DEBUG("adding frame with EIP 0x%08x (from 0x%08x) due to PLT", retAddr, sp);
         fprintf(outFile, "%08x ", retAddr);
     }
-    // Check if eip is in function prolog (ie. when ebp is not updated yet),
-    // and use esp in that case to get eip of calling frame.
-    // Similarly, detect if eip is in function epilog (ie. when ebp is already
-    // updated for return to caller), and again fall back to esp in that case.
-    else
+    else if (!debugTable.HaveInfo(ip))
     {
+        // Check if eip is in function prolog (ie. when ebp is not updated yet),
+        // and use esp in that case to get eip of calling frame.
+        // Similarly, detect if eip is in function epilog (ie. when ebp is already
+        // updated for return to caller), and again fall back to esp in that case.
+
         const unsigned int instrBytes = ptrace(PTRACE_PEEKTEXT, pid, ip, 0);
         int retAddrAddr = 0; /// address (on stack) where return address is stored
 

@@ -128,6 +128,7 @@ public:
 
     /// @brief Use debug info to get register value
     bool GetRegValue (const RegisterName reg, const unsigned int pc, Context& c) const;
+    bool HaveInfo (const unsigned int pc) const;
     void AddDebugInfo (const RegisterName reg, const unsigned int pc, const ExecChain& ec);
 
 private:
