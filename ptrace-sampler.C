@@ -254,7 +254,7 @@ void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable, 
               and a valid IP pointer
             */
 
-            unsigned int currAddr = lastGoodSp;
+            unsigned int currAddr = lastGoodSp + 4;
             bool success = false;
             while (currAddr < stackEnd)
             {
@@ -276,7 +276,7 @@ void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable, 
                     {
                         DEBUG("heuristic found better EBP 0x%08x (0x%x bytes further down on stack)",
                             candidateBp, currAddr - lastGoodSp);
-                        oldBp = candidateBp;
+                        oldBp = currAddr;
                         success = true;
                         fprintf(outFile, "+"); // add mark that next is a successfully reconstructed frame
                         break;
