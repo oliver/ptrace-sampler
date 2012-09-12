@@ -49,7 +49,7 @@ FILE* outFile = stderr;
 bool useFpoHeuristic = true;
 
 /// max. number of stack frames to trace back
-int maxFrames = 40;
+int maxFrames = 60;
 
 
 unsigned int stackStart = 0;
