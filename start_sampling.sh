@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ $# == 0 ]; then
+    echo "Usage: $0 <pid or procname> [<further options>]"
+    exit 1
+fi
+
 arg=$1
 shift
 
