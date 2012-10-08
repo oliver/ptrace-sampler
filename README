@@ -1,0 +1,55 @@
+Note: this is pre-alpha software. Use cases, architecture, commands and data
+formats might change without further notice; also, it lacks documentation,
+is not suitable for end users, and might have undocumented pitfalls.
+
+
+= Overview =
+Ptrace-sampler is a simple profiling tool for C/C++ applications under Linux.
+It is based on the idea of the "poor man's profiler": it attaches to the
+to-be-profiled process using the Linux ptrace() interface (like a debugger)
+and periodically collects the current stack trace of the process.
+From these stack traces it can be seen where the process spent most of its
+time, using the excellent KCachegrind tool as analysis GUI.
+
+= License =
+GPL v3 (TODO: include full GPL text)
+
+= Requirements =
+* Linux
+* Python 2.4+
+* several system tools (objdump, nm, readelf, addr2line)
+* only for initial building: g++, make
+* optionally: libbfd
+* optionally: libunwind
+* only for profile data analysis: KCachegrind
+** if necessary, the calltree file created by start_sampling.sh/samples2calltree.py
+can be copied to another system where KCachegrind is installed
+
+= Installation =
+Run "make" to compile. Run "make release" to create a .tgz which contains
+the complete profiling tool. 
+
+= Basic Usage =
+Run "start_sampling.sh" followed by the PID or name of the running process
+to be profiled. This will create a trace file with periodic backtraces.
+Hit Ctrl+C after some seconds; this will stop profiling and will create
+a Calltree file which is then displayed in KCachegrind (note: this post-
+processing step might take some minutes on the first run).
+
+In KCachegrind, useful views are:
+* call graph
+* annotated source code (make sure the source code is available, and its
+location is specified in KCachegrind preferences)
+* assembly code
+* Flat Profile (sorted by Incl. or Self)
+
+= Undocumented Parts =
+* ptrace-sampler command line options
+* sample_reader.py, resolve_addr.py
+* ~/.cache/ptrace-sampler/ directory
+* threading support
+* libunwind support
+* frame pointer heuristic
+* glibc debug info generation
+* VDSO/syscall problems
+* test apps
