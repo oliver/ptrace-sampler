@@ -47,10 +47,10 @@ clean:
 app%-gl: app%-gl.C
 	g++ -W -Wall -Wextra \
 	-g3 -O0 -rdynamic \
+	$+ \
 	-pthread \
-	-lglut \
-	-o $@ \
-	$+
+	-lGLU -lglut \
+	-o $@
 
 app%: app%.C
 	g++ -W -Wall -Wextra \
