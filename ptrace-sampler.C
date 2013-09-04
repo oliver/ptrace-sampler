@@ -401,6 +401,10 @@ int main (int argc, char* argv[])
         }
         else if (strcmp(argv[i], "--debug") == 0 || strcmp(argv[i], "-d") == 0)
         {
+#ifndef HAVE_LIBBFD
+            printf("error: debug info not supported\n");
+            exit(1);
+#endif
             useDebugInfo = true;
         }
         else if (strcmp(argv[i], "--no-debug") == 0 || strcmp(argv[i], "-nd") == 0)
