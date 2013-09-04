@@ -179,7 +179,7 @@ class SymbolResolver:
         self.a2lProcs = {} # holds a list of running addr2line processes (indexed by (binPath,section))
 
         # don't create core files if a subprocess crashes
-        resource.setrlimit(resource.RLIMIT_CORE, (0, -1))
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
         self.libFinder = LibFinder()
         self.disassembler = Disassembler()
