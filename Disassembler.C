@@ -127,13 +127,21 @@ void Disassembler::DisasPrintf (void* userData, const char* format, ...)
     {
         strcat(outBuffer, format);
     }
-    else
+    else if (strcmp(format, "%s"))
     {
-        assert( strcmp(format, "%s") == 0 );
         va_list args;
         va_start(args, format);
         const char* stringArg = va_arg(args, char*);
         strcat(outBuffer, stringArg);
+        va_end(args);
+    }
+    else
+    {
+        va_list args;
+        va_start(args, format);
+        char buffer[100];
+        vsnprintf(buffer, sizeof(buffer), format, args);
+        strcat(outBuffer, buffer);
         va_end(args);
     }
 }
