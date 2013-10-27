@@ -30,7 +30,7 @@ fi
 
 
 echo "attaching to '$arg' (PID $pid)"
-tracefile=/tmp/trace-$arg-`date +%Y%m%d-%H%M%S`-$pid.txt
+tracefile=trace-$arg-`date +%Y%m%d-%H%M%S`-$pid.txt
 ./ptrace-sampler --pid $pid $* 2>$tracefile
 res=$?
 echo "wrote $tracefile:"
