@@ -90,7 +90,10 @@ extract-vdso: extract-vdso.C Common.C MemoryMappings.C Vdso.C
 linux-gate.dso.1: extract-vdso
 	./extract-vdso linux-gate.dso.1
 
+RELEASE_VERSION=$(shell date '+%Y%m%d-%H%M%S')
 release: $(DIST_FILES)
-	tar cvzf ../ptrace-sampler-release-`date '+%Y%m%d-%H%M%S'`.tgz \
-	$(DIST_FILES)
+	mkdir ptrace-sampler-$(RELEASE_VERSION)
+	cp $(DIST_FILES) ptrace-sampler-$(RELEASE_VERSION)/
+	tar cvzf ptrace-sampler-release-$(RELEASE_VERSION).tgz ptrace-sampler-$(RELEASE_VERSION)/
+	rm -rf ptrace-sampler-$(RELEASE_VERSION)/
 
