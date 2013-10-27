@@ -6,6 +6,12 @@ LIBBFD_PREFIX:=/usr
 MAIN_BINS=ptrace-sampler ptrace-singlestep extract-vdso linux-gate.dso.1
 TEST_BINS=app1 app2 app4 app7-libc app9-gl app11-sigchld
 
+DIST_FILES= \
+    ptrace-sampler \
+    sample_reader.py samples2calltree.py resolve_addr.py \
+    syscalls.py cacher.py lib_finder.py \
+    start_sampling.sh
+
 PTRACE_SAMPLER_CXX_SRCS:= \
     ptrace-sampler.C \
     Common.C \
@@ -84,9 +90,7 @@ extract-vdso: extract-vdso.C Common.C MemoryMappings.C Vdso.C
 linux-gate.dso.1: extract-vdso
 	./extract-vdso linux-gate.dso.1
 
-release: ptrace-sampler
+release: $(DIST_FILES)
 	tar cvzf ../ptrace-sampler-release-`date '+%Y%m%d-%H%M%S'`.tgz \
-		ptrace-sampler sample_reader.py samples2calltree.py resolve_addr.py \
-		syscalls.py cacher.py lib_finder.py \
-		start_sampling.sh
+	$(DIST_FILES)
 
