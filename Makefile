@@ -10,7 +10,8 @@ DIST_FILES= \
     ptrace-sampler \
     sample_reader.py samples2calltree.py resolve_addr.py \
     syscalls.py cacher.py lib_finder.py \
-    start_sampling.sh
+    start_sampling.sh \
+    README
 
 PTRACE_SAMPLER_CXX_SRCS:= \
     ptrace-sampler.C \
