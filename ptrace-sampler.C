@@ -494,7 +494,6 @@ int main (int argc, char* argv[])
                 continue;
             }
             const int taskId = atoi(dir->d_name);
-            printf("    task: %d\n", taskId);
             fprintf(outFile, "T: %d\n", taskId);
 
             TaskInfo ti;
@@ -506,6 +505,11 @@ int main (int argc, char* argv[])
             allTasks.push_back(ti);
         }
         closedir(taskDir);
+    }
+
+    if (allTasks.size() > 1)
+    {
+        printf("found %d threads\n", allTasks.size());
     }
 
     // attach
@@ -525,7 +529,7 @@ int main (int argc, char* argv[])
             printf("unexpected waitpid result %d for PID %d; waitStat: %d\n", waitRes, allTasks[i].pid, waitStat);
             exit(1);
         }
-        printf("waitpid result: pid=%d, stat=%d\n", waitRes, waitStat);
+        DEBUG("waitpid result: pid=%d, stat=%d\n", waitRes, waitStat);
     }
 
     // let all tasks continue
@@ -565,7 +569,7 @@ int main (int argc, char* argv[])
 
     if (useFpoHeuristic && !useLibunwind)
     {
-        printf("stack start: 0x%x; end: 0x%x; size: %d\n", int(stackStart), int(stackEnd), int(stackEnd - stackStart));
+        DEBUG("stack start: 0x%x; end: 0x%x; size: %d\n", int(stackStart), int(stackEnd), int(stackEnd - stackStart));
     }
 
 

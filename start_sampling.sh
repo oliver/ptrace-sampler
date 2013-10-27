@@ -29,7 +29,7 @@ fi
 [ "x$pid" == "x" ] && exit 1
 
 
-echo "attaching to '$arg' (PID $pid)"
+echo "profiling '$arg' (PID $pid)"
 tracefile=trace-$arg-`date +%Y%m%d-%H%M%S`-$pid.txt
 ./ptrace-sampler --pid $pid $* 2>$tracefile
 res=$?
