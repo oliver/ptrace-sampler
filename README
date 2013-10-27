@@ -19,11 +19,13 @@ GPL v3 (TODO: include full GPL text)
 * Python 2.4+
 * several system tools (objdump, nm, readelf, addr2line)
 * only for initial building: g++, make
-* optionally: libbfd
+* optionally: libbfd (this can improve backtraces where system functions are involved)
+** for Ubuntu: install binutils-dev package
 * optionally: libunwind
 * only for profile data analysis: KCachegrind
 ** if necessary, the calltree file created by start_sampling.sh/samples2calltree.py
-can be copied to another system where KCachegrind is installed
+  can be copied to another system where KCachegrind is installed
+* for building OpenGL test apps: GLUT libraries (eg. freeglut)
 
 = Installation =
 Run "make" to compile. Run "make release" to create a .tgz which contains
@@ -53,3 +55,15 @@ location is specified in KCachegrind preferences)
 * glibc debug info generation
 * VDSO/syscall problems
 * test apps
+
+= FAQ =
+== Profiling fails with "failed to attach to PID ...: Operation not permitted" ==
+* if you're using Ubuntu, the ptrace protection might be active (see https://wiki.ubuntu.com/SecurityTeam/Roadmap/KernelHardening#ptrace_Protection)
+** either run start_sampling.sh with sudo
+** or run this command to allow attaching to any process (this change will be lost after reboot):
+  sudo bash -c 'echo 0 > /proc/sys/kernel/yama/ptrace_scope'
+
+== Call graphs show lots of "0x" numbers rather than functions names ==
+* make sure the profiled application has "frame pointers". For GCC, use the -fno-omit-frame-pointer compiler option.
+* install debug infos for used libraries (at least for libc6 and libstdc++)
+** for Ubuntu: -dbg packages; for Fedora/RHEL: -debuginfo packages
