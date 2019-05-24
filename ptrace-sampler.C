@@ -71,7 +71,7 @@ void CreateSampleLibunwind (const int pid, unw_addr_space_t targetAddrSpace, voi
     struct user_regs_struct regs;
     memset(&regs, 0x00, sizeof(regs));
     ptrace(PTRACE_GETREGS, pid, 0, &regs);
-    fprintf(outFile, "E: t=%d.%06d;p=%d;r_oeax=%lx\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.orig_eax);
+    fprintf(outFile, "E: t=%d.%06d;p=%d;r_oeax=%lx\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.orig_rax);
 
     unw_cursor_t cursor;
     const int success = unw_init_remote(&cursor, targetAddrSpace, uptInfo);
@@ -119,11 +119,11 @@ void CreateSampleFramepointer (const int pid, const DI::DebugTable& debugTable, 
     struct user_regs_struct regs;
     memset(&regs, 0x00, sizeof(regs));
     ptrace(PTRACE_GETREGS, pid, 0, &regs);
-    fprintf(outFile, "E: t=%d.%06d;p=%d;r_eax=%lx;r_oeax=%lx\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.eax, regs.orig_eax);
+    fprintf(outFile, "E: t=%d.%06d;p=%d;r_eax=%lx;r_oeax=%lx\t", int(tv.tv_sec), int(tv.tv_usec), pid, regs.rax, regs.orig_rax);
 
-    const unsigned int ip = regs.eip;
-    const unsigned int bp = regs.ebp;
-    const unsigned int sp = regs.esp;
+    const unsigned int ip = regs.rip;
+    const unsigned int bp = regs.rbp;
+    const unsigned int sp = regs.rsp;
 
     fprintf(outFile, "%08x ", ip);
 
