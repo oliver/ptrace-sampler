@@ -22,6 +22,7 @@ VdsoBinary::VdsoBinary ()
     const MemoryMappings::Mapping* vdsoMemory = allMappings.Find("[vdso]");
     if (!vdsoMemory)
     {
+        printf("no vdso found in mappings\n");
         return;
     }
     const unsigned int startAddress = vdsoMemory->start;
