@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <vector>
+#include <unistd.h>
 
 using std::vector;
 
